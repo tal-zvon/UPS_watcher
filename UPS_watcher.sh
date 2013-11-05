@@ -40,6 +40,9 @@ then
 #DEBUG:	echo "PID $$: no script currently running. Proceeding..." >> $LOG
 fi
 
+#Check if upower is installed
+which upower &>/dev/null || { echo 'upower not installed. This script will NOT work without it!'; exit 1; }
+
 #Keep checking the UPS status until power returns to it
 while [[ true ]]
 do
