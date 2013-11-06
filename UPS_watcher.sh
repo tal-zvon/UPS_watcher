@@ -38,10 +38,10 @@ AfterHibernation()
 #Make sure this script is not running already
 if [[ `pgrep -cf "/bin/bash [^ ]*$(basename $0)"` -gt 1 ]]
 then
-#DEBUG:	echo "PID $$: script already running" >> $LOG
+	echo "PID $$: script already running" >> $LOG
 	exit 0
-#DEBUG:else
-#DEBUG:	echo "PID $$: no script currently running. Proceeding..." >> $LOG
+else
+	echo "PID $$: no script currently running. Proceeding..." >> $LOG
 fi
 
 #Check if upower is installed
@@ -54,7 +54,7 @@ do
 	if [[ $(upower -d | grep percentage | grep -o '[0-9]*') -lt $BATTERY_THRESHOLD_IN_PERCENT ]] && [[ $(upower -d | grep on-battery | grep -o "yes\|no") == "yes" ]]
 	then
 		#Hibernate (or sleep or w/e)
-#DEBUG:		echo "PID $$: hibernating..." >> $LOG
+		echo "PID $$: hibernating..." >> $LOG
 		#Run BeforeHibernation function
 		BeforeHibernation
 		
@@ -63,17 +63,17 @@ do
 		
 		#After the computer wakes up, give upower 2 minutes to update its status to make sure it doesn't still say
 		#that the UPS is on battery power if it's not
-#DEBUG:		echo "PID $$: Computer just woke up. Waiting 120s" >> $LOG
+		echo "PID $$: Computer just woke up. Waiting 120s" >> $LOG
 		sleep 120
 	fi
 
 	#Exit script if the UPS gets power again
 	if [[ $(upower -d | grep on-battery | grep -o "yes\|no") == "no" ]]
 	then
-#DEBUG:		echo "PID $$: Power restored" >> $LOG
+		echo "PID $$: Power restored" >> $LOG
 		break
-#DEBUG:	else
-#DEBUG:		echo "PID $$: Still on battery. Waiting 30s..." >> $LOG
+	else
+		echo "PID $$: Still on battery. Waiting 30s..." >> $LOG
 	fi
 
 	#Wait before checking percentage again
