@@ -10,6 +10,10 @@ BATTERY_THRESHOLD_IN_PERCENT='20'
 #Log file
 LOG='/var/log/UPS_watcher.log'
 
+#Command to hibernate. This can be changed to something like 'poweroff',
+#'pm-hibernate', 'pm-suspend', 'pm-suspend-hybrid', or anything else you want
+SHUTOFF_COMMAND='pm-hibernate'
+
 #Code to run before hibernating
 BeforeHibernation()
 {
@@ -55,12 +59,7 @@ do
 		BeforeHibernation
 		
 		#Hibernate
-		#Right now, the script is using a suspend/hibernate hybrid, where the system is suspended, and after a certain period of time, the system
-		#hibernates. Ideally, the script would do a true hybrid, where it prepares to hibernate and suspends. In that case, if power is restored
-		#before the UPS runs out of battery life, the system would wake up quickly. If the UPS runs out of power while the system is suspended,
-		#the next time it is powered up, it will restore all programs that were running. This functionality has been added to Linux kernel 3.6.
-		#I'll have to see if it can easily be done on older kernels
-		sudo pm-suspend-hybrid
+		${SHUTOFF_COMMAND}
 		
 		#After the computer wakes up, give upower 2 minutes to update its status to make sure it doesn't still say
 		#that the UPS is on battery power if it's not
