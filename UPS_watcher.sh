@@ -64,6 +64,7 @@ do
 	                #Run BeforeHibernation function
 	                BeforeHibernation
 
+			echo "PID $$: Hibernating..." >> $LOG
 			#Hibernate
 			${SHUTOFF_COMMAND}
 
