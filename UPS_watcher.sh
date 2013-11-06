@@ -40,10 +40,10 @@ AfterHibernation()
 #Make sure this script is not running already
 if [[ `pgrep -cf "/bin/bash [^ ]*$(basename $0)"` -gt 1 ]]
 then
-	echo "PID $$: script already running" >> $LOG
+	echo "$(date +"%b %e %H:%M:%S"), PID $$: script already running" >> $LOG
 	exit 0
 else
-	echo "PID $$: no script currently running. Proceeding..." >> $LOG
+	echo "$(date +"%b %e %H:%M:%S"), PID $$: no script currently running. Proceeding..." >> $LOG
 fi
 
 #Check if upower is installed
@@ -55,43 +55,43 @@ do
 	#Check if battery is below $BATTERY_THRESHOLD_IN_PERCENT
 	if [[ $(upower -d | grep percentage | grep -o '[0-9]*') -lt $BATTERY_THRESHOLD_IN_PERCENT ]]
 	then
-		echo "PID $$: battery is below the ${BATTERY_THRESHOLD_IN_PERCENT}% threshold" >> $LOG
+		echo "$(date +"%b %e %H:%M:%S"), PID $$: battery is below the ${BATTERY_THRESHOLD_IN_PERCENT}% threshold" >> $LOG
 
 		#Check if UPS is still on battery power
 		if [[ $(upower -d | grep on-battery | grep -o "yes\|no") == "yes" ]]
 		then
-			echo "PID $$: UPS is on battery. Running pre-hibernation code..." >> $LOG
+			echo "$(date +"%b %e %H:%M:%S"), PID $$: UPS is on battery. Running pre-hibernation code..." >> $LOG
 	                #Run BeforeHibernation function
 	                BeforeHibernation
 
-			echo "PID $$: Hibernating..." >> $LOG
+			echo "$(date +"%b %e %H:%M:%S"), PID $$: Hibernating..." >> $LOG
 			#Hibernate
 			${SHUTOFF_COMMAND}
 
 			#After the computer wakes up, give upower 2 minutes to update its status to make sure it doesn't still say
 			#that the UPS is on battery power if it's not
-			echo "PID $$: Computer just woke up. Waiting 120s" >> $LOG
+			echo "$(date +"%b %e %H:%M:%S"), PID $$: Computer just woke up. Waiting 120s" >> $LOG
 			sleep 120
 
 			#Check if UPS has power again
 			if [[ $(upower -d | grep on-battery | grep -o "yes\|no") == "no" ]]
 			then
-				echo "PID $$: Power restored. Running post-hibernation code..." >> $LOG
+				echo "$(date +"%b %e %H:%M:%S"), PID $$: Power restored. Running post-hibernation code..." >> $LOG
 				#Run AfterHibernation function
 				AfterHibernation
-				echo "PID $$: post-hibernation code execution complete. Exiting..." >> $LOG
+				echo "$(date +"%b %e %H:%M:%S"), PID $$: post-hibernation code execution complete. Exiting..." >> $LOG
 				break
 			else
-				echo "PID $$: UPS still running off of battery. If it doesn't come back online in 30 seconds, the computer is going into hibernation again as soon as it's below the threshold." >> $LOG
+				echo "$(date +"%b %e %H:%M:%S"), PID $$: UPS still running off of battery. If it doesn't come back online in 30 seconds, the computer is going into hibernation again as soon as it's below the threshold." >> $LOG
 				#Give it another 30 seconds, and run the while loop again
 				sleep 30
 			fi
 		else
-			echo "PID $$: Power restored before hibernation could take place. Exiting..." >> $LOG
+			echo "$(date +"%b %e %H:%M:%S"), PID $$: Power restored before hibernation could take place. Exiting..." >> $LOG
 			break
 		fi
 	else
-		echo "PID $$: battery is still above the ${BATTERY_THRESHOLD_IN_PERCENT}% threshold. Waiting 30 seconds..." >> $LOG
+		echo "$(date +"%b %e %H:%M:%S"), PID $$: battery is still above the ${BATTERY_THRESHOLD_IN_PERCENT}% threshold. Waiting 30 seconds..." >> $LOG
 		sleep 30
 	fi
 done
