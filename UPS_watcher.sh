@@ -76,15 +76,18 @@ do
 			#Check if UPS has power again
 			if [[ $(upower -d | grep on-battery | grep -o "yes\|no") == "no" ]]
 			then
+				echo "PID $$: Power restored. Running post-hibernation code..." >> $LOG
 				#Run AfterHibernation function
 				AfterHibernation
+				echo "PID $$: post-hibernation code execution complete. Exiting..." >> $LOG
 				break
 			else
+				echo "PID $$: UPS still running off of battery. If it doesn't come back online in 30 seconds, the computer is going into hibernation again as soon as it's below the threshold." >> $LOG
 				#Give it another 30 seconds, and run the while loop again
 				sleep 30
 			fi
 		else
-			echo "PID $$: Power restored" >> $LOG
+			echo "PID $$: Power restored before hibernation could take place. Exiting..." >> $LOG
 			break
 		fi
 	else
