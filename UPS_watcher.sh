@@ -5,7 +5,7 @@
 ##################################
 
 #The battery percentage below which the computer will start taking action
-BATTERY_THRESHOLD_IN_PERCENT='80'
+BATTERY_THRESHOLD_IN_PERCENT='20'
 
 #Log file
 LOG='/var/log/UPS_watcher.log'
