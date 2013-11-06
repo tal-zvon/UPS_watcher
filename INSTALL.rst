@@ -28,7 +28,17 @@ and paste this at the end::
 	*/5 * * * * /bin/bash -c 'if [[ $(upower -d | grep on-battery | grep -o "yes\|no") == "yes" ]]; then /sbin/UPS_watcher.sh; fi'
 
 
-to tell cron to watch the status of the UPS every 5 minutes, and run the script as soon as the UPS is on battery power.
+to tell cron to watch the status of the UPS every 5 minutes, and run
+the script as soon as the UPS is on battery power.
+
+
+Configuration
+-------------
+
+To configure which commands will be run just before the system hibernates,
+where the log file goes, or what percentage the UPS should be at before
+the system should hibernate, edit the UPS_watcher.sh script directly. The
+user editable section is at the top, and clearly marked.
 
 
 Uninstall
@@ -41,4 +51,5 @@ To uninstall the script, delete it from /sbin::
 and delete the line you added during script installation to the cron table::
 
 	sudo crontab -e
-	#Delete line that starts with */5 and has the words "UPS_watcher.sh" in it
+	#Delete line that starts with */5 and has
+	#the words "UPS_watcher.sh" in it
