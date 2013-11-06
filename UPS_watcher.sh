@@ -71,6 +71,8 @@ do
 	if [[ $(upower -d | grep on-battery | grep -o "yes\|no") == "no" ]]
 	then
 		echo "PID $$: Power restored" >> $LOG
+		#Run AfterHibernation function
+		AfterHibernation
 		break
 	else
 		echo "PID $$: Still on battery. Waiting 30s..." >> $LOG
