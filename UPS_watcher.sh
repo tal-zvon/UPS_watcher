@@ -43,8 +43,8 @@ if [[ `pgrep -cf "/bin/bash [^ ]*$(basename $0)"` -gt 1 ]]
 then
 	echo "$(date +"%b %e %H:%M:%S"), PID $$: script already running" >> $LOG
 	exit 0
-else
-	echo "$(date +"%b %e %H:%M:%S"), PID $$: no script currently running. Proceeding..." >> $LOG
+#DEBUG:else
+#DEBUG:	echo "$(date +"%b %e %H:%M:%S"), PID $$: no script currently running. Proceeding..." >> $LOG
 fi
 
 #Check if upower is installed
