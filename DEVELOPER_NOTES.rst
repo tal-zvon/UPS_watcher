@@ -1,7 +1,5 @@
 Known issues::
 
-	"date >> /home/mint/Desktop/BeforeHibernation" lines got into the git repo. I only meant to use them during testing. Get rid of them
-
 Ideas for features::
 
 	Make it so that it can't be run without an argument so that it can't be run directly without cron
