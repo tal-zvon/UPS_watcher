@@ -43,6 +43,10 @@ then
 	exit 1
 fi
 
+#Only run if user is root
+uid=$(/usr/bin/id -u) && [ "$uid" = "0" ] ||
+{ echo "Only root can run $0, and unless you know what you are doing, only from cron. See INSTALL.rst" | fmt -w `tput cols`; exit 1; }
+
 #Make sure this script is not running already
 if [[ `pgrep -cf "/bin/bash [^ ]*$(basename $0)"` -gt 1 ]]
 then
