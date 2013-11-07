@@ -37,6 +37,13 @@ Now, edit your cron table::
 
 	sudo crontab -e
 
+	NOTE: If you don't know how vi works (the default text editor
+	on most systems), try:
+
+		sudo EDITOR=gedit crontab -e
+		OR
+		sudo EDITOR=pluma crontab -e
+
 and paste this at the end::
 
 	*/1 * * * * /bin/bash -c 'if [[ $(upower -d | grep on-battery | grep -o "yes\|no") == "yes" ]]; then /sbin/UPS_watcher.sh --cron; fi'
