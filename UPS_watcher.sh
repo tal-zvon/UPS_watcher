@@ -57,7 +57,10 @@ then
 fi
 
 #Check if upower is installed
-which upower &>/dev/null || { echo 'upower not installed. This script will NOT work without it!'; exit 1; }
+which upower &>/dev/null || { echo "$(date +"%b %e %H:%M:%S"), PID $$: upower not installed. This script will NOT work without it"'!' | tee -a $LOG; exit 1; }
+
+#Check if $SHUTOFF_COMMAND is an actual command
+[[ -x "${SHUTOFF_COMMAND}" ]] || { echo "$(date +"%b %e %H:%M:%S"), PID $$: ${SHUTOFF_COMMAND} is not a valid command"'!' | tee -a $LOG; exit 1; }
 
 #This boolean variable is set to true if the BeforeHibernation code ran
 #indicating that the AfterHibernation code should run too
