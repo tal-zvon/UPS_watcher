@@ -12,6 +12,8 @@ Known issues::
 	*The if statement that checks if UPS is on battery power should be above the one that checks the percentage, so that if power is restored before the threshold is hit, it doesn't keep waiting until it reaches the threshold
 		Fix added. Needs testing
 
+	This is not really a big issue, but I'm using pm-suspend for testing. Note to self: switch back to pm-hibernate when releasing
+
 Ideas for features::
 
 	Make it so that it can't be run without an argument so that it can't be run directly without cron
