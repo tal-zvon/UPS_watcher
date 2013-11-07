@@ -13,7 +13,7 @@ LOG='/var/log/UPS_watcher.log'
 #Command to hibernate. This can be changed to something like '/sbin/poweroff',
 #'/usr/sbin/pm-hibernate', '/usr/sbin/pm-suspend', '/usr/sbin/pm-suspend-hybrid', or anything else you want
 #Make sure to use the full path here!
-SHUTOFF_COMMAND='/usr/sbin/pm-suspend'
+SHUTOFF_COMMAND='/usr/sbin/pm-hibernate'
 
 #Code to run before hibernating
 BeforeHibernation()
@@ -21,7 +21,6 @@ BeforeHibernation()
 		#A function cannot be empty. If you don't want the script to do anything other than hibernate,
 		#leave the following echo line in place
 		echo -n ''
-		date >> /home/mint/Desktop/BeforeHibernation
 }
 
 #Code to run after power is restored
@@ -31,7 +30,6 @@ AfterHibernation()
 		#A function cannot be empty. If you don't want the script to do anything other than stop hibernating,
 		#leave the following echo line in place
 		echo -n ''
-		date >> /home/mint/Desktop/AfterHibernation
 }
 
 ##################################

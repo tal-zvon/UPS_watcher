@@ -1,7 +1,5 @@
 Known issues::
 
-	This is not really a big issue, but I'm using pm-suspend for testing. Note to self: switch back to pm-hibernate when releasing
-
 	"date >> /home/mint/Desktop/BeforeHibernation" lines got into the git repo. I only meant to use them during testing. Get rid of them
 
 Ideas for features::
