@@ -1,17 +1,5 @@
 Known issues::
 
-	AfterHibernation function doesn't run if computer comes back online after the additional 30 seconds it waits
-		This was fixed with the addition of the PREHIB_RAN boolean variable, but never tested because of the next bug
-			Post hibernation code should only kick in if hibernation actually happened
-			Test with:
-				power comes back on before hibernation happens
-				power comes back on while machine is hibernating
-				power comes back on during the 30 second window
-				it hibernates twice
-
-	*The if statement that checks if UPS is on battery power should be above the one that checks the percentage, so that if power is restored before the threshold is hit, it doesn't keep waiting until it reaches the threshold
-		Fix added. Needs testing
-
 	This is not really a big issue, but I'm using pm-suspend for testing. Note to self: switch back to pm-hibernate when releasing
 
 	"date >> /home/mint/Desktop/BeforeHibernation" lines got into the git repo. I only meant to use them during testing. Get rid of them
