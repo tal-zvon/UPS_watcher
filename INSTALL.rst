@@ -46,7 +46,7 @@ Uninstall
 
 To uninstall the script, delete it from /sbin::
 
-	sudo rm /sbin/UPS_watcher.sh
+	sudo rm -v /sbin/UPS_watcher.sh
 
 and delete the line you added during script installation to the cron table::
 
