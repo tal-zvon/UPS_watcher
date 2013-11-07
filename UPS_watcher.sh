@@ -10,9 +10,10 @@ BATTERY_THRESHOLD_IN_PERCENT='20'
 #Log file
 LOG='/var/log/UPS_watcher.log'
 
-#Command to hibernate. This can be changed to something like 'poweroff',
-#'pm-hibernate', 'pm-suspend', 'pm-suspend-hybrid', or anything else you want
-SHUTOFF_COMMAND='pm-suspend'
+#Command to hibernate. This can be changed to something like '/sbin/poweroff',
+#'/usr/sbin/pm-hibernate', '/usr/sbin/pm-suspend', '/usr/sbin/pm-suspend-hybrid', or anything else you want
+#Make sure to use the full path here!
+SHUTOFF_COMMAND='/usr/sbin/pm-suspend'
 
 #Code to run before hibernating
 BeforeHibernation()
