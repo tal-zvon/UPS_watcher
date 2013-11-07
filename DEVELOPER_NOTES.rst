@@ -9,7 +9,8 @@ Known issues::
 				power comes back on during the 30 second window
 				it hibernates twice
 
-	The if statement that checks if UPS is on battery power should be above the one that checks the percentage, so that if power is restored before the threshold is hit, it doesn't keep waiting until it reaches the threshold
+	*The if statement that checks if UPS is on battery power should be above the one that checks the percentage, so that if power is restored before the threshold is hit, it doesn't keep waiting until it reaches the threshold
+		Fix added. Needs testing
 
 Ideas for features::
 

@@ -57,23 +57,22 @@ PREHIB_RAN=false
 #Keep checking the UPS status until power returns to it
 while [[ true ]]
 do
-	#Check if battery is below $BATTERY_THRESHOLD_IN_PERCENT
-	if [[ $(upower -d | grep percentage | grep -o '[0-9]*') -lt $BATTERY_THRESHOLD_IN_PERCENT ]]
+	#Check if UPS is still on battery power
+	if [[ $(upower -d | grep on-battery | grep -o "yes\|no") == "yes" ]]
 	then
-		echo "$(date +"%b %e %H:%M:%S"), PID $$: battery is below the ${BATTERY_THRESHOLD_IN_PERCENT}% threshold" >> $LOG
-
-		#Check if UPS is still on battery power
-		if [[ $(upower -d | grep on-battery | grep -o "yes\|no") == "yes" ]]
+		echo "$(date +"%b %e %H:%M:%S"), PID $$: UPS is on battery." >> $LOG
+		#Check if battery is below $BATTERY_THRESHOLD_IN_PERCENT
+		if [[ $(upower -d | grep percentage | grep -o '[0-9]*') -lt $BATTERY_THRESHOLD_IN_PERCENT ]]
 		then
-			echo "$(date +"%b %e %H:%M:%S"), PID $$: UPS is on battery. Running pre-hibernation code..." >> $LOG
+			echo "$(date +"%b %e %H:%M:%S"), PID $$: UPS battery is below the ${BATTERY_THRESHOLD_IN_PERCENT}% threshold, and the UPS is still running on battery power. Running pre-hibernation code..." >> $LOG
 	                #Run BeforeHibernation function
 	                BeforeHibernation
 
 			#Set PREHIB_RAN variable to true to indicate the BeforeHibernation function ran
 			PREHIB_RAN=true
 
-			echo "$(date +"%b %e %H:%M:%S"), PID $$: Hibernating..." >> $LOG
 			#Hibernate
+			echo "$(date +"%b %e %H:%M:%S"), PID $$: Hibernating..." >> $LOG
 			${SHUTOFF_COMMAND}
 
 			#After the computer wakes up, give upower 2 minutes to update its status to make sure it doesn't still say
@@ -92,12 +91,12 @@ do
 				sleep 30
 			fi
 		else
-			echo "$(date +"%b %e %H:%M:%S"), PID $$: Power restored before hibernation could take place" >> $LOG
-			break
+			echo "$(date +"%b %e %H:%M:%S"), PID $$: battery is still above the ${BATTERY_THRESHOLD_IN_PERCENT}% threshold. Waiting 30 seconds..." >> $LOG
+			sleep 30
 		fi
 	else
-		echo "$(date +"%b %e %H:%M:%S"), PID $$: battery is still above the ${BATTERY_THRESHOLD_IN_PERCENT}% threshold. Waiting 30 seconds..." >> $LOG
-		sleep 30
+		echo "$(date +"%b %e %H:%M:%S"), PID $$: Power restored before hibernation could take place" >> $LOG
+		break
 	fi
 done
 
