@@ -1,6 +1,21 @@
 How it works
 ============
 
+Overview
+--------
+
+The script is a single file that gets triggered by cron when your
+UPS starts using battery power (as determined by `upower -d`). 
+
+Note: When the script runs, if you read the log file, you'll see
+lines that say "script already running". This is because cron
+doesn't care if the script is already running or not - if the
+UPS is on battery power, it will try to launch the script again
+and again once a minute. That log message is coming from another
+instance of the script that got run by cron. It simply figures out
+that the script is already running, and exits, leaving behind a log
+message for easier debugging. This is normal.
+
 
 Installing the Script
 ---------------------
@@ -14,6 +29,10 @@ Move the script to /sbin::
 
 	sudo cp -v UPS_watcher.sh /sbin/
 
+Configure the script::
+
+	See `Configuration` section below
+
 Now, edit your cron table::
 
 	sudo crontab -e
@@ -21,7 +40,6 @@ Now, edit your cron table::
 and paste this at the end::
 
 	*/1 * * * * /bin/bash -c 'if [[ $(upower -d | grep on-battery | grep -o "yes\|no") == "yes" ]]; then /sbin/UPS_watcher.sh --cron; fi'
-
 
 to tell cron to watch the status of the UPS every minute and run
 the script as soon as the UPS is on battery power.
@@ -39,6 +57,28 @@ To configure which commands will be run just before the system hibernates,
 where the log file goes, or what percentage the UPS should be at before
 the system should hibernate, edit the UPS_watcher.sh script directly. The
 user editable section is at the top, and clearly marked.
+
+
+Seeing it in action
+-------------------
+
+To observe what the script is doing while it's doing it, I just open 3
+terminal windows, running the following 3 commands, one per window::
+
+	#This command just follows the log file as it gets updated
+	#Note: The UPS_watcher.log files does NOT exist until the first
+	#time the script runs
+	$ less +F /var/log/UPS_watcher.log
+
+	#This shows the status of the UPS, as determined by the upower command
+	#This information is how cron, and the script both determine if the
+	#UPS is using battery power or not
+	$ watch -n1 'upower -d | grep "on-battery\|percent\|state" | tr -s " "'
+
+	#This will tell you if/when the script is actually running
+	#Note: Only happens when cron sees that the UPS is running
+	#on battery power
+	$ watch -n1 'ps -Af | grep UPS | grep -v "grep\|vim\|watch \|less"'
 
 
 Uninstall
