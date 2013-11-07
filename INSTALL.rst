@@ -80,6 +80,12 @@ terminal windows, running the following 3 commands, one per window::
 	#on battery power
 	$ watch -n1 'ps -Af | grep UPS | grep -v "grep\|vim\|watch \|less"'
 
+then I unplug my UPS from the wall to see what happens.
+
+Note: Don't forget that many UPS's have several slots that are only protected
+from surges, and not actually on battery backup. If you unplug your UPS,
+anything in these slots will lose power.
+
 
 Uninstall
 ---------
