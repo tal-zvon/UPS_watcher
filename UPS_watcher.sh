@@ -60,7 +60,6 @@ do
 	#Check if UPS is still on battery power
 	if [[ $(upower -d | grep on-battery | grep -o "yes\|no") == "yes" ]]
 	then
-		echo "$(date +"%b %e %H:%M:%S"), PID $$: UPS is on battery." >> $LOG
 		#Check if battery is below $BATTERY_THRESHOLD_IN_PERCENT
 		if [[ $(upower -d | grep percentage | grep -o '[0-9]*') -lt $BATTERY_THRESHOLD_IN_PERCENT ]]
 		then
