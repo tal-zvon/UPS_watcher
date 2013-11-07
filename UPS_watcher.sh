@@ -36,6 +36,13 @@ AfterHibernation()
 ###END OF USER EDITABLE SECTION###
 ##################################
 
+#Make sure people read the INSTALL file and don't run the script without cron
+if [[ "$@" != "--cron" ]]
+then
+	echo "This script is not meant to be run manually. Are you really planning to run the script by hand every time there's a power outage? Read the INSTALL.rst file." | fmt -w `tput cols`
+	exit 1
+fi
+
 #Make sure this script is not running already
 if [[ `pgrep -cf "/bin/bash [^ ]*$(basename $0)"` -gt 1 ]]
 then

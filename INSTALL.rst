@@ -25,11 +25,16 @@ Now, edit your cron table::
 
 and paste this at the end::
 
-	*/5 * * * * /bin/bash -c 'if [[ $(upower -d | grep on-battery | grep -o "yes\|no") == "yes" ]]; then /sbin/UPS_watcher.sh; fi'
+	*/1 * * * * /bin/bash -c 'if [[ $(upower -d | grep on-battery | grep -o "yes\|no") == "yes" ]]; then /sbin/UPS_watcher.sh --cron; fi'
 
 
 to tell cron to watch the status of the UPS every 5 minutes, and run
 the script as soon as the UPS is on battery power.
+
+Note: If you are concerned about letting cron run the above line every
+minute because you think it takes a lot of resources, I wouldn't worry
+about it. My system takes exactly 0.016 seconds to run that line and
+exit, assuming everything is ok - it's not exactly a resource hog.
 
 
 Configuration
