@@ -50,6 +50,10 @@ fi
 #Check if upower is installed
 which upower &>/dev/null || { echo 'upower not installed. This script will NOT work without it!'; exit 1; }
 
+#This boolean variable is set to true if the BeforeHibernation code ran
+#indicating that the AfterHibernation code should run too
+PREHIB_RAN=false
+
 #Keep checking the UPS status until power returns to it
 while [[ true ]]
 do
@@ -65,6 +69,9 @@ do
 	                #Run BeforeHibernation function
 	                BeforeHibernation
 
+			#Set PREHIB_RAN variable to true to indicate the BeforeHibernation function ran
+			PREHIB_RAN=true
+
 			echo "$(date +"%b %e %H:%M:%S"), PID $$: Hibernating..." >> $LOG
 			#Hibernate
 			${SHUTOFF_COMMAND}
@@ -77,10 +84,7 @@ do
 			#Check if UPS has power again
 			if [[ $(upower -d | grep on-battery | grep -o "yes\|no") == "no" ]]
 			then
-				echo "$(date +"%b %e %H:%M:%S"), PID $$: Power restored. Running post-hibernation code..." >> $LOG
-				#Run AfterHibernation function
-				AfterHibernation
-				echo "$(date +"%b %e %H:%M:%S"), PID $$: post-hibernation code execution complete. Exiting..." >> $LOG
+				echo "$(date +"%b %e %H:%M:%S"), PID $$: Power restored" >> $LOG
 				break
 			else
 				echo "$(date +"%b %e %H:%M:%S"), PID $$: UPS still running off of battery. If it doesn't come back online in 30 seconds, the computer is going into hibernation again as soon as it's below the threshold." >> $LOG
@@ -88,7 +92,7 @@ do
 				sleep 30
 			fi
 		else
-			echo "$(date +"%b %e %H:%M:%S"), PID $$: Power restored before hibernation could take place. Exiting..." >> $LOG
+			echo "$(date +"%b %e %H:%M:%S"), PID $$: Power restored before hibernation could take place" >> $LOG
 			break
 		fi
 	else
@@ -96,5 +100,14 @@ do
 		sleep 30
 	fi
 done
+
+#Check if AfterHibernation function should run (if BeforeHibernation function ran)
+if $PREHIB_RAN
+then
+	#Run AfterHibernation function
+	AfterHibernation
+	echo "$(date +"%b %e %H:%M:%S"), PID $$: post-hibernation code execution complete" >> $LOG
+fi
+echo "$(date +"%b %e %H:%M:%S"), PID $$: Exiting..." >> $LOG
 
 exit 0
