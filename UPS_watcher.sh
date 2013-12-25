@@ -76,8 +76,10 @@ SwapCheck()
 		)
 
 		#Check if we have enough swap to hibernate
-		if [[ `echo "$FREE_SWAP < $MIN_SWAP_SIZE" | bc` == 1 ]]
+		if [[ `echo "$FREE_SWAP > $MIN_SWAP_SIZE" | bc` == 1 ]]
 		then
+			return
+		else
 			#Not enough swap space for hibernation
 			echo "$(date +"%b %e %H:%M:%S"), PID $$: Not enough swap space to hibernate"'!' | tee -a $LOG
 
@@ -85,18 +87,10 @@ SwapCheck()
 			if [[ -z $SWAP_FILE ]]
 			then
 				echo "$(date +"%b %e %H:%M:%S"), PID $$: No swap file specified" | tee -a $LOG
-
-				#Fall back plan (suspend?)
-				echo "$(date +"%b %e %H:%M:%S"), PID $$: Going to fallback plan (suspend)" | tee -a $LOG
-				SHUTOFF_COMMAND=$(which pm-suspend)
 			elif [[ ! -d `dirname $SWAP_FILE` ]]
 			then
 				#Directory for swap file does NOT exist
 				echo "$(date +"%b %e %H:%M:%S"), PID $$: Swap directory ($(dirname $SWAP_FILE)) does not exist"'!' | tee -a $LOG
-
-				#Fall back plan (suspend?)
-				echo "$(date +"%b %e %H:%M:%S"), PID $$: Going to fallback plan (suspend)" | tee -a $LOG
-				SHUTOFF_COMMAND=$(which pm-suspend)
 			else
 				#Check if there is enough hard drive space
 				#to make a swap file
@@ -110,27 +104,29 @@ SwapCheck()
 					#Check how much swap we have now
 					FREE_SWAP=$(free -m | grep Swap | tr -s ' ' | cut -d ' ' -f 4)
 
-					if [[ `echo "$FREE_SWAP < $MIN_SWAP_SIZE" | bc` == 1 ]]
+					if [[ `echo "$FREE_SWAP > $MIN_SWAP_SIZE" | bc` == 1 ]]
 					then
+						return
+					else
 						#Creating swap file failed
 						#Delete it
 						echo "$(date +"%b %e %H:%M:%S"), PID $$: Failed to create swap file"'!' | tee -a $LOG
 						swapoff $SWAP_FILE &&
 						rm -f $SWAP_FILE
-
-						#Fall back plan (suspend?)
-						echo "$(date +"%b %e %H:%M:%S"), PID $$: Going to fallback plan (suspend)" | tee -a $LOG
-						SHUTOFF_COMMAND=$(which pm-suspend)
 					fi
 					
 				else
 					#Not enough space on HDD for swap file
 					#Fall back plan (suspend?)
 					echo "$(date +"%b %e %H:%M:%S"), PID $$: Not enough space on HDD (only ${FREE_HDD_SPACE_IN_MB}MB) for swap file of size $MIN_SWAP_SIZE"'!' | tee -a $LOG
-					echo "$(date +"%b %e %H:%M:%S"), PID $$: Going to fallback plan (suspend)" | tee -a $LOG
-					SHUTOFF_COMMAND=$(which pm-suspend)
 				fi
 			fi
+
+			#If we weren't hibernating in the first place, or swap file creation was successful,
+			#we have already returned from this function. If we are at this stage however,
+			#something failed and we are going to fallback (suspend)
+			echo "$(date +"%b %e %H:%M:%S"), PID $$: Going to fallback plan (suspend)" | tee -a $LOG
+			SHUTOFF_COMMAND=$(which pm-suspend)
 		fi
 	fi
 }
