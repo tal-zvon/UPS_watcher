@@ -184,7 +184,15 @@ do
 			PREHIB_RAN=true
 
 			#Hibernate
-			echo "$(date +"%b %e %H:%M:%S"), PID $$: Hibernating..." >> $LOG
+			if echo $SHUTOFF_COMMAND | grep -q hibernate
+			then
+				echo "$(date +"%b %e %H:%M:%S"), PID $$: Hibernating..." >> $LOG
+			elif echo $SHUTOFF_COMMAND | grep -q 'suspend$'
+			then
+				echo "$(date +"%b %e %H:%M:%S"), PID $$: Suspending..." >> $LOG
+			else
+				echo "$(date +"%b %e %H:%M:%S"), PID $$: Running ${SHUTOFF_COMMAND}..." >> $LOG
+			fi
 			${SHUTOFF_COMMAND}
 
 			#After the computer wakes up, give upower 2 minutes to update its status to make sure it doesn't still say
