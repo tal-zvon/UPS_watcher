@@ -98,27 +98,8 @@ SwapCheck()
 				#to make a swap file
 				if [[ $FREE_HDD_SPACE_IN_MB -gt $MIN_SWAP_SIZE ]]
 				then
-					#Create swap file
-					dd if=/dev/zero of=$SWAP_FILE bs=1M count=$MIN_SWAP_SIZE &&
-					mkswap $SWAP_FILE &&
-					swapon $SWAP_FILE
-
-					#Check how much swap we have now
-					FREE_SWAP=$(free -m | grep Swap | tr -s ' ' | cut -d ' ' -f 4)
-
-					#If you started out with 0 swap, and you just added MIN_SWAP_SIZE, you might have
-					#slightly less free swap than MIN_SWAP_SIZE
-					if [[ $FREE_SWAP -gt `expr $MIN_SWAP_SIZE - 100` ]]
-					then
-						return
-					else
-						#Creating swap file failed
-						#Delete it
-						echo "$(date +"%b %e %H:%M:%S"), PID $$: Failed to create swap file"'!' | tee -a $LOG
-						swapoff $SWAP_FILE &&
-						rm -f $SWAP_FILE
-					fi
-					
+					MAKE_SWAP_FILE=true
+					return
 				else
 					#Not enough space on HDD for swap file
 					#Fall back plan (suspend?)
@@ -187,7 +168,36 @@ do
 			#Hibernate
 			if echo $SHUTOFF_COMMAND | grep -q hibernate
 			then
-				echo "$(date +"%b %e %H:%M:%S"), PID $$: Hibernating..." >> $LOG
+				#Check if we should make a swap file
+				if $MAKE_SWAP_FILE
+				then
+					#Create swap file
+					dd if=/dev/zero of=$SWAP_FILE bs=1M count=$MIN_SWAP_SIZE &&
+					mkswap $SWAP_FILE &&
+					swapon $SWAP_FILE
+
+					#Check how much swap we have now
+					FREE_SWAP=$(free -m | grep Swap | tr -s ' ' | cut -d ' ' -f 4)
+
+					#If you started out with 0 swap, and you just added MIN_SWAP_SIZE, you might have
+					#slightly less free swap than MIN_SWAP_SIZE
+					if [[ $FREE_SWAP -gt `expr $MIN_SWAP_SIZE - 100` ]]
+					then
+						echo "$(date +"%b %e %H:%M:%S"), PID $$: Hibernating..." >> $LOG
+					else
+						#Creating swap file failed
+						#Delete it
+						echo "$(date +"%b %e %H:%M:%S"), PID $$: Failed to create swap file"'!' | tee -a $LOG
+						swapoff $SWAP_FILE &&
+						rm -f $SWAP_FILE
+
+						#Fall back to suspend
+						echo "$(date +"%b %e %H:%M:%S"), PID $$: Going to fallback plan (suspend)" | tee -a $LOG
+						SHUTOFF_COMMAND=$(which pm-suspend)
+
+						echo "$(date +"%b %e %H:%M:%S"), PID $$: Suspending..." >> $LOG
+					fi
+				fi
 			elif echo $SHUTOFF_COMMAND | grep -q 'suspend$'
 			then
 				echo "$(date +"%b %e %H:%M:%S"), PID $$: Suspending..." >> $LOG
@@ -227,6 +237,14 @@ then
 	#Run AfterHibernation function
 	AfterHibernation
 	echo "$(date +"%b %e %H:%M:%S"), PID $$: post-hibernation code execution complete" >> $LOG
+fi
+
+#Check if we should remove SWAP_FILE
+if [[ -e $SWAP_FILE ]]
+then
+	echo "$(date +"%b %e %H:%M:%S"), PID $$: Removing temp swap file..." >> $LOG
+	swapoff $SWAP_FILE &&
+	rm -f $SWAP_FILE
 fi
 echo "$(date +"%b %e %H:%M:%S"), PID $$: Exiting..." >> $LOG
 
