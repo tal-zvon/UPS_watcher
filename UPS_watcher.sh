@@ -5,7 +5,7 @@
 ##################################
 
 #The battery percentage below which the computer will start taking action
-BATTERY_THRESHOLD_IN_PERCENT='90'
+BATTERY_THRESHOLD_IN_PERCENT='20'
 
 #Log file
 LOG='/var/log/UPS_watcher.log'
@@ -15,8 +15,7 @@ LOG='/var/log/UPS_watcher.log'
 #it can create a swap file that it will temporarily use
 #Specify where to store this file, or leave blank (SWAP_FILE='')
 #not to have a swap file
-#SWAP_FILE='/tmp/SWAPFILE'
-SWAP_FILE='/home/tal/Desktop/SWAPFILE'
+SWAP_FILE='/tmp/SWAPFILE'
 
 #Command to hibernate. This can be changed to something like '/sbin/poweroff',
 #'/usr/sbin/pm-hibernate', '/usr/sbin/pm-suspend', '/usr/sbin/pm-suspend-hybrid', or anything else you want
