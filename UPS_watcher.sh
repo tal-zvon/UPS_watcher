@@ -106,7 +106,9 @@ SwapCheck()
 					#Check how much swap we have now
 					FREE_SWAP=$(free -m | grep Swap | tr -s ' ' | cut -d ' ' -f 4)
 
-					if [[ $FREE_SWAP -gt $MIN_SWAP_SIZE ]]
+					#If you started out with 0 swap, and you just added MIN_SWAP_SIZE, you might have
+					#slightly less free swap than MIN_SWAP_SIZE
+					if [[ $FREE_SWAP -gt `expr $MIN_SWAP_SIZE - 100` ]]
 					then
 						return
 					else
