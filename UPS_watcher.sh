@@ -5,7 +5,7 @@
 ##################################
 
 #The battery percentage below which the computer will start taking action
-BATTERY_THRESHOLD_IN_PERCENT='20'
+BATTERY_THRESHOLD_IN_PERCENT='90'
 
 #Log file
 LOG='/var/log/UPS_watcher.log'
@@ -15,7 +15,8 @@ LOG='/var/log/UPS_watcher.log'
 #it can create a swap file that it will temporarily use
 #Specify where to store this file, or leave blank (SWAP_FILE='')
 #not to have a swap file
-SWAP_FILE='/tmp/SWAPFILE'
+#SWAP_FILE='/tmp/SWAPFILE'
+SWAP_FILE='/home/tal/Desktop/SWAPFILE'
 
 #Command to hibernate. This can be changed to something like '/sbin/poweroff',
 #'/usr/sbin/pm-hibernate', '/usr/sbin/pm-suspend', '/usr/sbin/pm-suspend-hybrid', or anything else you want
@@ -54,9 +55,11 @@ SwapCheck()
 
 		#Figure out some info about how much RAM, swap, and HDD space we have
 		TOTAL_RAM=$(free -m | grep Mem | tr -s ' ' | cut -d ' ' -f 2)
-		TOTAL_RAM_PLUS_5_PERCENT=$(echo "$TOTAL_RAM * 1.05" | bc)
+		#Truncated to be a whole number:
+		TOTAL_RAM_PLUS_5_PERCENT=$(echo "$TOTAL_RAM * 1.05" | bc | grep -o '^[0-9]*')
 		USED_RAM=$(free -m | grep Mem | tr -s ' ' | cut -d ' ' -f 3)
-		USED_RAM_PLUS_20_PERCENT=$(echo "$USED_RAM * 1.20" | bc)
+		#Truncated to be a whole number:
+		USED_RAM_PLUS_20_PERCENT=$(echo "$USED_RAM * 1.20" | bc | grep -o '^[0-9]*')
 		FREE_SWAP=$(free -m | grep Swap | tr -s ' ' | cut -d ' ' -f 4)
 		FREE_HDD_SPACE_IN_MB=$(df -BM `dirname $SWAP_FILE` | grep dev | tr -s ' ' | cut -d ' ' -f 4 | grep -o '[0-9]*')
 
@@ -67,7 +70,7 @@ SwapCheck()
 		#Total RAM + 5%
 		#whichever is smaller
 		MIN_SWAP_SIZE=$(
-			if [[ `echo "$USED_RAM_PLUS_20_PERCENT < $TOTAL_RAM_PLUS_5_PERCENT" | bc` == 1 ]]
+			if [[ $USED_RAM_PLUS_20_PERCENT -lt $TOTAL_RAM_PLUS_5_PERCENT ]]
 			then
 				echo "$USED_RAM_PLUS_20_PERCENT"
 			else
@@ -76,7 +79,7 @@ SwapCheck()
 		)
 
 		#Check if we have enough swap to hibernate
-		if [[ `echo "$FREE_SWAP > $MIN_SWAP_SIZE" | bc` == 1 ]]
+		if [[ $FREE_SWAP -gt $MIN_SWAP_SIZE ]]
 		then
 			return
 		else
@@ -94,17 +97,17 @@ SwapCheck()
 			else
 				#Check if there is enough hard drive space
 				#to make a swap file
-				if [[ `echo "$FREE_HDD_SPACE_IN_MB > $MIN_SWAP_SIZE" | bc` == 1 ]]
+				if [[ $FREE_HDD_SPACE_IN_MB -gt $MIN_SWAP_SIZE ]]
 				then
 					#Create swap file
-					dd if=/dev/zero of=$SWAP_FILE bs=1M count=$MIN_SWAP_SIZE
-					mkswap $SWAP_FILE
+					dd if=/dev/zero of=$SWAP_FILE bs=1M count=$MIN_SWAP_SIZE &&
+					mkswap $SWAP_FILE &&
 					swapon $SWAP_FILE
 
 					#Check how much swap we have now
 					FREE_SWAP=$(free -m | grep Swap | tr -s ' ' | cut -d ' ' -f 4)
 
-					if [[ `echo "$FREE_SWAP > $MIN_SWAP_SIZE" | bc` == 1 ]]
+					if [[ $FREE_SWAP -gt $MIN_SWAP_SIZE ]]
 					then
 						return
 					else
