@@ -10,13 +10,6 @@ BATTERY_THRESHOLD_IN_PERCENT='20'
 #Log file
 LOG='/var/log/UPS_watcher.log'
 
-#Hibernation requires enough swap to save your RAM to it
-#If the script detects that you do not have enough swap for this,
-#it can create a swap file that it will temporarily use
-#Specify where to store this file, or leave blank (SWAP_FILE='')
-#not to have a swap file
-SWAP_FILE='/tmp/SWAPFILE'
-
 #Command to hibernate. This can be changed to something like '/sbin/poweroff',
 #'/usr/sbin/pm-hibernate', '/usr/sbin/pm-suspend', '/usr/sbin/pm-suspend-hybrid', or anything else you want
 #Make sure to use the full path here!
@@ -43,79 +36,6 @@ AfterHibernation()
 ###END OF USER EDITABLE SECTION###
 ##################################
 
-#Check if we have enough swap space to hibernate
-SwapCheck()
-{
-	#Only run the following check if we are hibernating
-	if echo $SHUTOFF_COMMAND | grep -q hibernate
-	then
-		#Clear disk cache
-		echo 3 | sudo tee /proc/sys/vm/drop_caches >/dev/null
-
-		#Figure out some info about how much RAM, swap, and HDD space we have
-		TOTAL_RAM=$(free -m | grep Mem | tr -s ' ' | cut -d ' ' -f 2)
-		#Truncated to be a whole number:
-		TOTAL_RAM_PLUS_5_PERCENT=$(echo "$TOTAL_RAM * 1.05" | bc | grep -o '^[0-9]*')
-		USED_RAM=$(free -m | grep Mem | tr -s ' ' | cut -d ' ' -f 3)
-		#Truncated to be a whole number:
-		USED_RAM_PLUS_20_PERCENT=$(echo "$USED_RAM * 1.20" | bc | grep -o '^[0-9]*')
-		FREE_SWAP=$(free -m | grep Swap | tr -s ' ' | cut -d ' ' -f 4)
-		FREE_HDD_SPACE_IN_MB=$(df -BM `dirname $SWAP_FILE` | grep dev | tr -s ' ' | cut -d ' ' -f 4 | grep -o '[0-9]*')
-
-		#Check how much swap space we need
-		#This is either:
-		#Used RAM + 20%
-		#OR
-		#Total RAM + 5%
-		#whichever is smaller
-		MIN_SWAP_SIZE=$(
-			if [[ $USED_RAM_PLUS_20_PERCENT -lt $TOTAL_RAM_PLUS_5_PERCENT ]]
-			then
-				echo "$USED_RAM_PLUS_20_PERCENT"
-			else
-				echo "$TOTAL_RAM_PLUS_5_PERCENT"
-			fi
-		)
-
-		#Check if we have enough swap to hibernate
-		if [[ $FREE_SWAP -gt $MIN_SWAP_SIZE ]]
-		then
-			return
-		else
-			#Not enough swap space for hibernation
-			echo "$(date +"%b %e %H:%M:%S"), PID $$: Not enough swap space to hibernate"'!' | tee -a $LOG
-
-			#Check if we are allowed to make a swap file
-			if [[ -z $SWAP_FILE ]]
-			then
-				echo "$(date +"%b %e %H:%M:%S"), PID $$: No swap file specified" | tee -a $LOG
-			elif [[ ! -d `dirname $SWAP_FILE` ]]
-			then
-				#Directory for swap file does NOT exist
-				echo "$(date +"%b %e %H:%M:%S"), PID $$: Swap directory ($(dirname $SWAP_FILE)) does not exist"'!' | tee -a $LOG
-			else
-				#Check if there is enough hard drive space
-				#to make a swap file
-				if [[ $FREE_HDD_SPACE_IN_MB -gt $MIN_SWAP_SIZE ]]
-				then
-					MAKE_SWAP_FILE=true
-					return
-				else
-					#Not enough space on HDD for swap file
-					#Fall back plan (suspend?)
-					echo "$(date +"%b %e %H:%M:%S"), PID $$: Not enough space on HDD (only ${FREE_HDD_SPACE_IN_MB}MB) for swap file of size $MIN_SWAP_SIZE"'!' | tee -a $LOG
-				fi
-			fi
-
-			#If we weren't hibernating in the first place, or swap file creation was successful,
-			#we have already returned from this function. If we are at this stage however,
-			#something failed and we are going to fallback (suspend)
-			echo "$(date +"%b %e %H:%M:%S"), PID $$: Going to fallback plan (suspend)" | tee -a $LOG
-			SHUTOFF_COMMAND=$(which pm-suspend)
-		fi
-	fi
-}
-
 #Make sure people read the INSTALL file and don't run the script without cron
 if [[ "$@" != "--cron" ]]
 then
@@ -138,9 +58,6 @@ fi
 
 #Check if upower is installed
 which upower &>/dev/null || { echo "$(date +"%b %e %H:%M:%S"), PID $$: upower not installed. This script will NOT work without it"'!' | tee -a $LOG; exit 1; }
-
-#Check if we have enough swap space to hibernate (if hibernation is what we want)
-SwapCheck
 
 #Check if $SHUTOFF_COMMAND is an actual command
 [[ -x "${SHUTOFF_COMMAND}" ]] || { echo "$(date +"%b %e %H:%M:%S"), PID $$: ${SHUTOFF_COMMAND} is not a valid command"'!' | tee -a $LOG; exit 1; }
@@ -168,35 +85,24 @@ do
 			#Hibernate
 			if echo $SHUTOFF_COMMAND | grep -q hibernate
 			then
-				#Check if we should make a swap file
-				if $MAKE_SWAP_FILE
+				#Check if we have enough swap to hibernate
+
+				#Check how much swap we have now
+				FREE_SWAP=$(free -m | grep Swap | tr -s ' ' | cut -d ' ' -f 4)
+
+				#Check how much ram we have now
+				TOTAL_RAM=$(free -m | grep Mem | tr -s ' ' | cut -d ' ' -f 2)
+
+				#Check if we have more SWAP than RAM
+				if [[ $FREE_SWAP -gt $TOTAL_RAM ]]
 				then
-					#Create swap file
-					dd if=/dev/zero of=$SWAP_FILE bs=1M count=$MIN_SWAP_SIZE &&
-					mkswap $SWAP_FILE &&
-					swapon $SWAP_FILE
+					echo "$(date +"%b %e %H:%M:%S"), PID $$: Hibernating..." >> $LOG
+				else
+					echo "$(date +"%b %e %H:%M:%S"), PID $$: Now enough free swap space to hibernate"'!' | tee -a $LOG
+					echo "$(date +"%b %e %H:%M:%S"), PID $$: Going to fallback plan (suspend)" | tee -a $LOG
+					SHUTOFF_COMMAND=$(which pm-suspend)
 
-					#Check how much swap we have now
-					FREE_SWAP=$(free -m | grep Swap | tr -s ' ' | cut -d ' ' -f 4)
-
-					#If you started out with 0 swap, and you just added MIN_SWAP_SIZE, you might have
-					#slightly less free swap than MIN_SWAP_SIZE
-					if [[ $FREE_SWAP -gt `expr $MIN_SWAP_SIZE - 100` ]]
-					then
-						echo "$(date +"%b %e %H:%M:%S"), PID $$: Hibernating..." >> $LOG
-					else
-						#Creating swap file failed
-						#Delete it
-						echo "$(date +"%b %e %H:%M:%S"), PID $$: Failed to create swap file"'!' | tee -a $LOG
-						swapoff $SWAP_FILE &&
-						rm -f $SWAP_FILE
-
-						#Fall back to suspend
-						echo "$(date +"%b %e %H:%M:%S"), PID $$: Going to fallback plan (suspend)" | tee -a $LOG
-						SHUTOFF_COMMAND=$(which pm-suspend)
-
-						echo "$(date +"%b %e %H:%M:%S"), PID $$: Suspending..." >> $LOG
-					fi
+					echo "$(date +"%b %e %H:%M:%S"), PID $$: Suspending..." >> $LOG
 				fi
 			elif echo $SHUTOFF_COMMAND | grep -q 'suspend$'
 			then
@@ -239,13 +145,6 @@ then
 	echo "$(date +"%b %e %H:%M:%S"), PID $$: post-hibernation code execution complete" >> $LOG
 fi
 
-#Check if we should remove SWAP_FILE
-if [[ -e $SWAP_FILE ]]
-then
-	echo "$(date +"%b %e %H:%M:%S"), PID $$: Removing temp swap file..." >> $LOG
-	swapoff $SWAP_FILE &&
-	rm -f $SWAP_FILE
-fi
 echo "$(date +"%b %e %H:%M:%S"), PID $$: Exiting..." >> $LOG
 
 exit 0
