@@ -10,6 +10,16 @@ BATTERY_THRESHOLD_IN_PERCENT='20'
 #Log file
 LOG='/var/log/UPS_watcher.log'
 
+#Hibernation requires enough swap space to save your RAM to it
+#If you have no swap partition, you can use a temporary swap file
+#that will be created every time the system needs to hibernate, and
+#destroyed right after it comes out of hibernation
+#To see how to do this, read the 'Using a swap file' section of INSTALL.rst
+ENABLE_SWAP=false
+
+#Location for the temporary swap file
+SWAP_FILE='/swap'
+
 #Command to hibernate. This can be changed to something like '/sbin/poweroff',
 #'/usr/sbin/pm-hibernate', '/usr/sbin/pm-suspend', '/usr/sbin/pm-suspend-hybrid', or anything else you want
 #Make sure to use the full path here!
@@ -17,24 +27,131 @@ SHUTOFF_COMMAND='/usr/sbin/pm-hibernate'
 
 #Code to run before hibernating
 BeforeHibernation()
-{
-	#A function cannot be empty. If you don't want the script to do anything other than hibernate,
-	#leave the following echo line in place
-	echo -n ''
+{ :
+	#Put any code you want to run before hibernation happens here
 }
 
 #Code to run after power is restored
 AfterHibernation()
-{
-
-	#A function cannot be empty. If you don't want the script to do anything other than stop hibernating,
-	#leave the following echo line in place
-	echo -n ''
+{ :
+	#Put any code you want to run after power is restored here
 }
 
 ##################################
 ###END OF USER EDITABLE SECTION###
 ##################################
+
+#Create swap file
+CreateSwap()
+{
+	#Check if uswsusp is installed
+	if ! type s2disk &>/dev/null
+	then
+		echo "$(date +"%b %e %H:%M:%S"), PID $$: uswsusp does not appear to be installed. Cannot hibernate from swap image without it"'!'" See INSTALL.rst" | tee -a $LOG
+		echo "$(date +"%b %e %H:%M:%S"), PID $$: Going to fallback plan (suspend)" | tee -a $LOG
+
+		SHUTOFF_COMMAND=$(which pm-suspend)
+		echo "$(date +"%b %e %H:%M:%S"), PID $$: Suspending..." >> $LOG
+
+		return
+	fi
+
+	#Check if uswsusp is configured (/etc/uswsusp.conf exists)
+	if [[ ! -e /etc/uswsusp.conf ]]
+	then
+		echo "$(date +"%b %e %H:%M:%S"), PID $$: /etc/uswsusp.conf does not exist"'!'" You must configure uswsusp.conf. See INSTALL.rst" | tee -a $LOG
+		echo "$(date +"%b %e %H:%M:%S"), PID $$: Going to fallback plan (suspend)" | tee -a $LOG
+
+		SHUTOFF_COMMAND=$(which pm-suspend)
+		echo "$(date +"%b %e %H:%M:%S"), PID $$: Suspending..." >> $LOG
+
+		return
+	fi
+
+	#Clear disk cache
+	echo 3 | sudo tee /proc/sys/vm/drop_caches >/dev/null
+
+	#Figure out some info about how much RAM, swap, and HDD space we have
+	TOTAL_RAM=$(free -m | grep Mem | tr -s ' ' | cut -d ' ' -f 2)
+	#Truncated to be a whole number:
+	TOTAL_RAM_PLUS_5_PERCENT=$(echo "$TOTAL_RAM * 1.05" | bc | grep -o '^[0-9]*')
+	USED_RAM=$(free -m | grep Mem | tr -s ' ' | cut -d ' ' -f 3)
+	#Truncated to be a whole number:
+	USED_RAM_PLUS_20_PERCENT=$(echo "$USED_RAM * 1.20" | bc | grep -o '^[0-9]*')
+	FREE_SWAP=$(free -m | grep Swap | tr -s ' ' | cut -d ' ' -f 4)
+	FREE_HDD_SPACE_IN_MB=$(df -BM `dirname $SWAP_FILE` | grep dev | tr -s ' ' | cut -d ' ' -f 4 | grep -o '[0-9]*')
+
+	#Check how much swap space we need
+	#This is either:
+	#Used RAM + 20%
+	#OR
+	#Total RAM + 5%
+	#whichever is smaller
+	MIN_SWAP_SIZE=$(
+		if [[ $USED_RAM_PLUS_20_PERCENT -lt $TOTAL_RAM_PLUS_5_PERCENT ]]
+		then
+			echo "$USED_RAM_PLUS_20_PERCENT"
+		else
+			echo "$TOTAL_RAM_PLUS_5_PERCENT"
+		fi
+	)
+
+	echo "$(date +"%b %e %H:%M:%S"), PID $$: Creating swap file at $SWAP_FILE" | tee -a $LOG
+
+	#Check if we are able to make a swap file
+	if [[ -z $SWAP_FILE ]]
+	then
+		echo "$(date +"%b %e %H:%M:%S"), PID $$: No swap file specified" | tee -a $LOG
+	elif [[ ! -d `dirname $SWAP_FILE` ]]
+	then
+		#Directory for swap file does NOT exist
+		echo "$(date +"%b %e %H:%M:%S"), PID $$: Swap directory ($(dirname $SWAP_FILE)) does not exist"'!' | tee -a $LOG
+	else
+		#Check if there is enough hard drive space
+		#to make a swap file
+		if [[ $FREE_HDD_SPACE_IN_MB -gt $MIN_SWAP_SIZE ]]
+		then
+			fallocate -l ${MIN_SWAP_SIZE}m ${SWAP_FILE} &&
+			mkswap ${SWAP_FILE} &&
+			echo "${SWAP_FILE}	swap	swap	defaults	0	0" >> /etc/fstab &&
+			swapon ${SWAP_FILE} &&
+			swap-offset ${SWAP_FILE} >> /etc/uswsusp.conf
+
+			#Check how much swap we have now
+			FREE_SWAP=$(free -m | grep Swap | tr -s ' ' | cut -d ' ' -f 4)
+
+			#Check if swap file created successfully
+			#If you started out with 0 swap, and you just added MIN_SWAP_SIZE, you might have
+			#slightly less free swap than MIN_SWAP_SIZE
+			if [[ $FREE_SWAP -gt `expr $MIN_SWAP_SIZE - 100` ]]
+			then
+				echo "$(date +"%b %e %H:%M:%S"), PID $$: Hibernating..." >> $LOG
+				return
+			else
+				echo "$(date +"%b %e %H:%M:%S"), PID $$: Failed to create swap file"'!' >> $LOG
+
+				#Undo what we did with swap file
+				if [[ -e $SWAP_FILE ]]
+				then
+					swapoff $SWAP_FILE 2>/dev/null &&
+					rm -f $SWAP_FILE
+					sed -i '\#$SWAP_FILE#d' /etc/fstab
+					sed -i '/resume offset =/d' /etc/uswsusp.conf
+				fi
+			fi
+		else
+			#Not enough space on HDD for swap file
+			echo "$(date +"%b %e %H:%M:%S"), PID $$: Not enough space on HDD (only ${FREE_HDD_SPACE_IN_MB}MB) for swap file of size $MIN_SWAP_SIZE"'!' | tee -a $LOG
+		fi
+	fi
+
+	#If swap file creation was successful, we have already returned from this function.
+	#If we are at this stage however, something failed and we are going to fallback (suspend)
+	echo "$(date +"%b %e %H:%M:%S"), PID $$: Going to fallback plan (suspend)" | tee -a $LOG
+	SHUTOFF_COMMAND=$(which pm-suspend)
+
+	echo "$(date +"%b %e %H:%M:%S"), PID $$: Suspending..." >> $LOG
+}
 
 #Make sure people read the INSTALL file and don't run the script without cron
 if [[ "$@" != "--cron" ]]
@@ -82,27 +199,13 @@ do
 			#Set PREHIB_RAN variable to true to indicate the BeforeHibernation function ran
 			PREHIB_RAN=true
 
-			#Hibernate
+			#Check if we are hibernating, suspening, or something else
 			if echo $SHUTOFF_COMMAND | grep -q hibernate
 			then
-				#Check if we have enough swap to hibernate
-
-				#Check how much swap we have now
-				FREE_SWAP=$(free -m | grep Swap | tr -s ' ' | cut -d ' ' -f 4)
-
-				#Check how much ram we have now
-				TOTAL_RAM=$(free -m | grep Mem | tr -s ' ' | cut -d ' ' -f 2)
-
-				#Check if we have more SWAP than RAM
-				if [[ $FREE_SWAP -gt $TOTAL_RAM ]]
+				#Check if we should make a swap file
+				if $ENABLE_SWAP
 				then
-					echo "$(date +"%b %e %H:%M:%S"), PID $$: Hibernating..." >> $LOG
-				else
-					echo "$(date +"%b %e %H:%M:%S"), PID $$: Now enough free swap space to hibernate"'!' | tee -a $LOG
-					echo "$(date +"%b %e %H:%M:%S"), PID $$: Going to fallback plan (suspend)" | tee -a $LOG
-					SHUTOFF_COMMAND=$(which pm-suspend)
-
-					echo "$(date +"%b %e %H:%M:%S"), PID $$: Suspending..." >> $LOG
+					CreateSwap
 				fi
 			elif echo $SHUTOFF_COMMAND | grep -q 'suspend$'
 			then
@@ -110,6 +213,8 @@ do
 			else
 				echo "$(date +"%b %e %H:%M:%S"), PID $$: Running ${SHUTOFF_COMMAND}..." >> $LOG
 			fi
+
+			#Hibernate
 			${SHUTOFF_COMMAND}
 
 			#After the computer wakes up, give upower 2 minutes to update its status to make sure it doesn't still say
@@ -143,6 +248,16 @@ then
 	#Run AfterHibernation function
 	AfterHibernation
 	echo "$(date +"%b %e %H:%M:%S"), PID $$: post-hibernation code execution complete" >> $LOG
+fi
+
+#Check if we should remove SWAP_FILE
+if [[ -e $SWAP_FILE ]]
+then
+	echo "$(date +"%b %e %H:%M:%S"), PID $$: Removing temp swap file..." >> $LOG
+	swapoff $SWAP_FILE &&
+	rm -f $SWAP_FILE
+	sed -i '\#$SWAP_FILE#d' /etc/fstab
+	sed -i '/resume offset =/d' /etc/uswsusp.conf
 fi
 
 echo "$(date +"%b %e %H:%M:%S"), PID $$: Exiting..." >> $LOG

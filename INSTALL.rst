@@ -65,6 +65,39 @@ where the log file goes, or what percentage the UPS should be at before
 the system should hibernate, edit the UPS_watcher.sh script directly. The
 user editable section is at the top, and clearly marked.
 
+The only configurable section that merits further explanation is the swap
+file. See below.
+
+
+Using a swap file
+-----------------
+Hibernation requires enough swap space to save your RAM to it. If you have
+a swap partition - great. If not, you can have the script automatically
+create a swap file on your hard drive to use as swap every time the system
+needs to hibernate, and destroy the file when it is done hibernation.
+
+To do this:
+
+Install uswsusp::
+	sudo apt-get install uswsusp
+Create or edit /etc/uswsusp.conf, and make sure this is what's in it::
+	resume device = /dev/sda1
+	compress = y
+	early writeout = y
+	image size = 0
+	RSA key file = /etc/uswsusp.key
+	shutdown method = platform
+
+Where '/dev/sda1' is the device where your swap file will reside.
+This is likely to be your root partition (run "df /" if not sure).
+
+Now that uswsusp.conf is configured, stop the kernel from using
+the swap file for swapping::
+	sudo sysctl -w vm.swappiness=1 
+	echo vm.swappiness=1 | sudo tee -a /etc/sysctl.d/local.conf
+
+And enable usage of a swap file in the UPS_watcher script by setting::
+	ENABLE_SWAP=true
 
 Seeing it in action
 -------------------
