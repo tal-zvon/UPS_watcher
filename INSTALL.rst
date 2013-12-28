@@ -78,26 +78,39 @@ needs to hibernate, and destroy the file when it is done hibernation.
 
 To do this:
 
-Install uswsusp::
-	sudo apt-get install uswsusp
-Create or edit /etc/uswsusp.conf, and make sure this is what's in it::
-	resume device = /dev/sda1
-	compress = y
-	early writeout = y
-	image size = 0
-	RSA key file = /etc/uswsusp.key
-	shutdown method = platform
-
-Where '/dev/sda1' is the device where your swap file will reside.
-This is likely to be your root partition (run "df /" if not sure).
-
-Now that uswsusp.conf is configured, stop the kernel from using
-the swap file for swapping::
+Stop the kernel from using the swap file for swapping::
 	sudo sysctl -w vm.swappiness=1 
 	echo vm.swappiness=1 | sudo tee -a /etc/sysctl.d/local.conf
-
+Create a swap file::
+	sudo fallocate -l 2048m /swap
+	sudo mkswap /swap
+Mount it::
+	sudo swapon /swap
+Install uswsusp::
+	sudo apt-get install uswsusp
+Configure uswsusp::
+	sudo dpkg-reconfigure -pmedium uswsusp
+		If it asks "Continue without a valid swap space?", answer Yes. 
+		If it asks "Swap space to resume from:", select the partition where the swap file above was created. 
+		The other options are up to you
+Edit /etc/default/grub::
+	Add 'resume=/dev/sda1' to GRUB_CMDLINE_LINUX_DEFAULT
+  where /dev/sda1 is the same as the 'resume device' from /etc/uswsusp.conf.
+Update the grub menu::
+	sudo update-grub
+Edit /etc/fstab and add::
+	/swap	swap	swap	defaults	0	0 
+Save and close all programs you don't want to risk dying
+And test it all with::
+	sudo s2disk
+If your computer hibernates, and wakes up properly, run the following line
+to delete the test swap file you just created, and some references to it
+(as the script will automatically create the swap file and these references
+when the machine needs to hibernate)::
+	sudo swapoff /swap && sudo rm -f /swap; sudo sed -i '\#/swap#d' /etc/fstab; sudo sed -i '/resume offset =/d' /etc/uswsusp.conf
 And enable usage of a swap file in the UPS_watcher script by setting::
 	ENABLE_SWAP=true
+
 
 Seeing it in action
 -------------------
