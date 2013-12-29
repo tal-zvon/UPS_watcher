@@ -176,6 +176,21 @@ fi
 #Check if upower is installed
 which upower &>/dev/null || { echo "$(date +"%b %e %H:%M:%S"), PID $$: upower not installed. This script will NOT work without it"'!' | tee -a $LOG; exit 1; }
 
+#Make sure swap file doesn't already exist, and isn't mounted
+if [[ `swapon -s | wc -l` -gt 1 ]]
+then
+	#Swap file exists, and is mounted
+	IFS=$'\n'
+	for LINE in $(swapon -s | grep -v Filename | sed -e 's/\t.*//g' -e 's/  .*//g')
+	do
+		swapoff $LINE && 2>/dev/null
+		rm -f $LINE 2>/dev/null
+	done
+
+	sed -i '/swap/d' /etc/fstab 2>/dev/null
+	sed -i '/resume offset =/d' /etc/uswsusp.conf 2>/dev/null
+fi
+
 #Check if $SHUTOFF_COMMAND is an actual command
 [[ -x "${SHUTOFF_COMMAND}" ]] || { echo "$(date +"%b %e %H:%M:%S"), PID $$: ${SHUTOFF_COMMAND} is not a valid command"'!' | tee -a $LOG; exit 1; }
 
