@@ -86,6 +86,8 @@ Create a swap file::
 	sudo mkswap /swap
 Mount it::
 	sudo swapon /swap
+Edit /etc/fstab and add::
+	/swap	swap	swap	defaults	0	0 
 Install uswsusp::
 	sudo apt-get install uswsusp
 Configure uswsusp::
@@ -98,8 +100,6 @@ Edit /etc/default/grub::
   where /dev/sda1 is the same as the 'resume device' from /etc/uswsusp.conf.
 Update the grub menu::
 	sudo update-grub
-Edit /etc/fstab and add::
-	/swap	swap	swap	defaults	0	0 
 Save and close all programs you don't want to risk dying
 And test it all with::
 	sudo s2disk
