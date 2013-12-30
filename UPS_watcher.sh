@@ -224,6 +224,25 @@ do
 				if $ENABLE_SWAP
 				then
 					CreateSwap
+				else
+					#Check if we have enough swap to hibernate
+					#Check how much swap we have now
+					FREE_SWAP=$(free -m | grep Swap | tr -s ' ' | cut -d ' ' -f 4)
+
+					#Check how much ram we have now
+					TOTAL_RAM=$(free -m | grep Mem | tr -s ' ' | cut -d ' ' -f 2)
+
+					#Check if we have more SWAP than RAM
+					if [[ $FREE_SWAP -gt $TOTAL_RAM ]]
+					then
+						echo "$(date +"%b %e %H:%M:%S"), PID $$: Hibernating..." >> $LOG	
+					else
+						echo "$(date +"%b %e %H:%M:%S"), PID $$: Not enough free swap space to hibernate"'!' | tee -a $LOG
+						echo "$(date +"%b %e %H:%M:%S"), PID $$: Going to fallback plan (suspend)" | tee -a $LOG
+						SHUTOFF_COMMAND=$(which pm-suspend)
+
+						echo "$(date +"%b %e %H:%M:%S"), PID $$: Suspending..." >> $LOG
+					fi
 				fi
 			elif echo $SHUTOFF_COMMAND | grep -q 'suspend$'
 			then
