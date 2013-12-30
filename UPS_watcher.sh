@@ -56,18 +56,6 @@ CreateSwap()
 		return
 	fi
 
-	#Check if uswsusp is configured (/etc/uswsusp.conf exists)
-	if [[ ! -e /etc/uswsusp.conf ]]
-	then
-		echo "$(date +"%b %e %H:%M:%S"), PID $$: /etc/uswsusp.conf does not exist"'!'" You must configure uswsusp.conf. See INSTALL.rst" | tee -a $LOG
-		echo "$(date +"%b %e %H:%M:%S"), PID $$: Going to fallback plan (suspend)" | tee -a $LOG
-
-		SHUTOFF_COMMAND=$(which pm-suspend)
-		echo "$(date +"%b %e %H:%M:%S"), PID $$: Suspending..." >> $LOG
-
-		return
-	fi
-
 	#Clear disk cache
 	echo 3 | sudo tee /proc/sys/vm/drop_caches >/dev/null
 
@@ -112,10 +100,21 @@ CreateSwap()
 		if [[ $FREE_HDD_SPACE_IN_MB -gt $MIN_SWAP_SIZE ]]
 		then
 			fallocate -l ${MIN_SWAP_SIZE}m ${SWAP_FILE} &&
-			mkswap ${SWAP_FILE} &&
+			mkswap ${SWAP_FILE} >/dev/null &&
 			echo "${SWAP_FILE}	swap	swap	defaults	0	0" >> /etc/fstab &&
 			swapon ${SWAP_FILE} &&
-			swap-offset ${SWAP_FILE} >> /etc/uswsusp.conf
+			if [[ -e /etc/uswsusp.conf ]]
+			then
+				#Update 'resume offset'
+				sed -i '/resume offset =/d' /etc/uswsusp.conf
+				swap-offset ${SWAP_FILE} >> /etc/uswsusp.conf
+				dpkg-reconfigure -fnoninteractive uswsusp >/dev/null
+			else
+				dpkg-reconfigure -fnoninteractive uswsusp >/dev/null
+				#Update 'resume offset'
+				sed -i '/resume offset =/d' /etc/uswsusp.conf
+				swap-offset ${SWAP_FILE} >> /etc/uswsusp.conf
+			fi
 
 			#Check how much swap we have now
 			FREE_SWAP=$(free -m | grep Swap | tr -s ' ' | cut -d ' ' -f 4)
@@ -126,6 +125,10 @@ CreateSwap()
 			if [[ $FREE_SWAP -gt `expr $MIN_SWAP_SIZE - 100` ]]
 			then
 				echo "$(date +"%b %e %H:%M:%S"), PID $$: Hibernating..." >> $LOG
+
+				#Change to the uswsusp way of hibernating,
+				#which allows for hibernating from a swap file
+				SHUTOFF_COMMAND=$(which s2disk)
 				return
 			else
 				echo "$(date +"%b %e %H:%M:%S"), PID $$: Failed to create swap file"'!' >> $LOG
@@ -215,7 +218,7 @@ do
 			PREHIB_RAN=true
 
 			#Check if we are hibernating, suspening, or something else
-			if echo $SHUTOFF_COMMAND | grep -q hibernate
+			if echo $SHUTOFF_COMMAND | grep -q hibernate || echo $SHUTOFF_COMMAND | grep -q s2disk
 			then
 				#Check if we should make a swap file
 				if $ENABLE_SWAP
