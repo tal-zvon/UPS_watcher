@@ -144,7 +144,7 @@ CreateSwap()
 			fi
 		else
 			#Not enough space on HDD for swap file
-			echo "$(date +"%b %e %H:%M:%S"), PID $$: Not enough space on HDD (only ${FREE_HDD_SPACE_IN_MB}MB) for swap file of size $MIN_SWAP_SIZE"'!' | tee -a $LOG
+			echo "$(date +"%b %e %H:%M:%S"), PID $$: Not enough space on HDD (only ${FREE_HDD_SPACE_IN_MB}MB) for swap file of size ${MIN_SWAP_SIZE}MB"'!' | tee -a $LOG
 		fi
 	fi
 
