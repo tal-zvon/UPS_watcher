@@ -69,7 +69,8 @@ CreateSwap()
 	FREE_SWAP=$(free -m | grep Swap | tr -s ' ' | cut -d ' ' -f 4)
 	#If SWAP_FILE is empty, it will get cought later on and the FREE_HDD_SPACE_IN_MB var won't
 	#be used anyway, so this prevents dirname from showing an error when SWAP_FILE is empty
-	[[ -n $SWAP_FILE ]] && FREE_HDD_SPACE_IN_MB=$(df -BM `dirname $SWAP_FILE` | grep dev | tr -s ' ' | cut -d ' ' -f 4 | grep -o '[0-9]*')
+	#or the directory doesn't exist
+	[[ -n $SWAP_FILE ]] && [[ -d `dirname $SWAP_FILE` ]] && FREE_HDD_SPACE_IN_MB=$(df -BM `dirname $SWAP_FILE` | grep dev | tr -s ' ' | cut -d ' ' -f 4 | grep -o '[0-9]*')
 
 	#Check how much swap space we need
 	#This is either:
