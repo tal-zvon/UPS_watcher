@@ -220,7 +220,12 @@ do
 			PREHIB_RAN=true
 
 			#Check if we are hibernating, suspening, or something else
-			if echo $SHUTOFF_COMMAND | grep -q hibernate || echo $SHUTOFF_COMMAND | grep -q s2disk
+			#Swap needs to be dealt with in cases where:
+				#we are hibernating with pm-hibernate
+				#we are hibernating with s2disk
+				#we are doing a suspend and hibernate with pm-suspend-hybrid
+				#we are doing a suspend and hibernate with s2both
+			if echo $SHUTOFF_COMMAND | grep -q hibernate || echo $SHUTOFF_COMMAND | grep -q s2disk || echo $SHUTOFF_COMMAND | grep -q s2both || echo $SHUTOFF_COMMAND | grep -q hybrid
 			then
 				#Check if we should make a swap file
 				if $ENABLE_SWAP
