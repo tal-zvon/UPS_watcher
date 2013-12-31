@@ -110,9 +110,9 @@ CreateSwap()
 				#Update 'resume offset'
 				sed -i '/resume offset =/d' /etc/uswsusp.conf
 				swap-offset ${SWAP_FILE} >> /etc/uswsusp.conf
-				dpkg-reconfigure -fnoninteractive uswsusp >/dev/null
+				dpkg-reconfigure -fnoninteractive uswsusp &>/dev/null
 			else
-				dpkg-reconfigure -fnoninteractive uswsusp >/dev/null
+				dpkg-reconfigure -fnoninteractive uswsusp &>/dev/null
 				#Update 'resume offset'
 				sed -i '/resume offset =/d' /etc/uswsusp.conf
 				swap-offset ${SWAP_FILE} >> /etc/uswsusp.conf
