@@ -67,7 +67,9 @@ CreateSwap()
 	#Truncated to be a whole number:
 	USED_RAM_PLUS_20_PERCENT=$(echo "$USED_RAM * 1.20" | bc | grep -o '^[0-9]*')
 	FREE_SWAP=$(free -m | grep Swap | tr -s ' ' | cut -d ' ' -f 4)
-	FREE_HDD_SPACE_IN_MB=$(df -BM `dirname $SWAP_FILE` | grep dev | tr -s ' ' | cut -d ' ' -f 4 | grep -o '[0-9]*')
+	#If SWAP_FILE is empty, it will get cought later on and the FREE_HDD_SPACE_IN_MB var won't
+	#be used anyway, so this prevents dirname from showing an error when SWAP_FILE is empty
+	[[ -n $SWAP_FILE ]] && FREE_HDD_SPACE_IN_MB=$(df -BM `dirname $SWAP_FILE` | grep dev | tr -s ' ' | cut -d ' ' -f 4 | grep -o '[0-9]*')
 
 	#Check how much swap space we need
 	#This is either:
@@ -84,8 +86,6 @@ CreateSwap()
 		fi
 	)
 
-	echo "$(date +"%b %e %H:%M:%S"), PID $$: Creating swap file at $SWAP_FILE" | tee -a $LOG
-
 	#Check if we are able to make a swap file
 	if [[ -z $SWAP_FILE ]]
 	then
@@ -99,6 +99,8 @@ CreateSwap()
 		#to make a swap file
 		if [[ $FREE_HDD_SPACE_IN_MB -gt $MIN_SWAP_SIZE ]]
 		then
+			echo "$(date +"%b %e %H:%M:%S"), PID $$: Creating swap file at $SWAP_FILE" | tee -a $LOG
+
 			fallocate -l ${MIN_SWAP_SIZE}m ${SWAP_FILE} &&
 			mkswap ${SWAP_FILE} >/dev/null &&
 			echo "${SWAP_FILE}	swap	swap	defaults	0	0" >> /etc/fstab &&
