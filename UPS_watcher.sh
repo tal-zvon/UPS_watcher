@@ -258,8 +258,12 @@ do
 
 			#After the computer wakes up, give upower 2 minutes to update its status to make sure it doesn't still say
 			#that the UPS is on battery power if it's not
-			echo "$(date +"%b %e %H:%M:%S"), PID $$: Computer just woke up. Waiting 120s" >> $LOG
-			sleep 120
+			echo "$(date +"%b %e %H:%M:%S"), PID $$: Computer just woke up. Waiting up to 120s for update to battery status" >> $LOG
+			for VAR in {1..120}
+			do
+				sleep 1
+				[[ $(upower -d | grep on-battery | grep -o "yes\|no") == "no" ]] && break
+			done
 
 			#Check if UPS has power again
 			if [[ $(upower -d | grep on-battery | grep -o "yes\|no") == "no" ]]
