@@ -262,7 +262,7 @@ do
 			fi
 
 			#Hibernate
-			${SHUTOFF_COMMAND}
+			${SHUTOFF_COMMAND} || { echo "$(date +"%b %e %H:%M:%S"), PID $$: Failed to run ${SHUTOFF_COMMAND}"'!'" Going to fallback plan (suspend)" | tee -a $LOG; echo "$(date +"%b %e %H:%M:%S"), PID $$: Suspending..." >> $LOG; SHUTOFF_COMMAND=$(which pm-suspend); ${SHUTOFF_COMMAND}; }
 
 			#After the computer wakes up, give upower 2 minutes to update its status to make sure it doesn't still say
 			#that the UPS is on battery power if it's not
