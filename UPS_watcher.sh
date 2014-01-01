@@ -22,6 +22,7 @@ SWAP_FILE='/swap'
 
 #Command to hibernate. This can be changed to something like '/sbin/poweroff',
 #'/usr/sbin/pm-hibernate', '/usr/sbin/pm-suspend', '/usr/sbin/pm-suspend-hybrid', or anything else you want
+#You can also include any arguments to the command
 #Make sure to use the full path here!
 SHUTOFF_COMMAND='/usr/sbin/pm-hibernate'
 
@@ -198,7 +199,8 @@ then
 fi
 
 #Check if $SHUTOFF_COMMAND is an actual command
-[[ -x "${SHUTOFF_COMMAND}" ]] || { echo "$(date +"%b %e %H:%M:%S"), PID $$: ${SHUTOFF_COMMAND} is not a valid command"'!' | tee -a $LOG; exit 1; }
+#Ignore arguments to the command
+[[ -x $(echo "${SHUTOFF_COMMAND}" | sed 's/ .*//g') ]] || { echo "$(date +"%b %e %H:%M:%S"), PID $$: $(echo ${SHUTOFF_COMMAND} | sed 's/ .*//g') is not a valid command"'!' | tee -a $LOG; exit 1; }
 
 #This boolean variable is set to true if the BeforeHibernation code ran
 #indicating that the AfterHibernation code should run too
