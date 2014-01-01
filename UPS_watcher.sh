@@ -201,6 +201,8 @@ which upower &>/dev/null || { LOGGER "$(date +"%b %e %H:%M:%S"), PID $$: upower 
 #Make sure swap file doesn't already exist, and isn't mounted
 if [[ `swapon -s | wc -l` -gt 1 ]]
 then
+	LOGGER "$(date +"%b %e %H:%M:%S"), PID $$: Old temporary swap file detected. Unmounting and removing..."
+
 	#Swap file exists, and is mounted
 	IFS=$'\n'
 	for LINE in $(swapon -s | grep -v Filename | sed -e 's/\t.*//g' -e 's/  .*//g')
