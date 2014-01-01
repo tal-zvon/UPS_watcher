@@ -52,9 +52,9 @@ LOGGER()
 {
 	if $QUIET
 	then
-		echo "$@" >> $LOG
+		echo "$(date +"%b %e %H:%M:%S"), PID $$: $@" >> $LOG
 	else
-		echo "$@" | tee -a $LOG
+		echo "$(date +"%b %e %H:%M:%S"), PID $$: $@" | tee -a $LOG
 	fi
 
 }
@@ -65,11 +65,11 @@ CreateSwap()
 	#Check if uswsusp is installed
 	if ! type s2disk &>/dev/null
 	then
-		LOGGER "$(date +"%b %e %H:%M:%S"), PID $$: uswsusp does not appear to be installed. Cannot hibernate from swap image without it"'!'" See INSTALL.rst"
-		LOGGER "$(date +"%b %e %H:%M:%S"), PID $$: Going to fallback plan (suspend)"
+		LOGGER "uswsusp does not appear to be installed. Cannot hibernate from swap image without it"'!'" See INSTALL.rst"
+		LOGGER "Going to fallback plan (suspend)"
 
 		SHUTOFF_COMMAND=$(which pm-suspend)
-		LOGGER "$(date +"%b %e %H:%M:%S"), PID $$: Suspending..."
+		LOGGER "Suspending..."
 
 		return
 	fi
@@ -108,17 +108,17 @@ CreateSwap()
 	#Check if we are able to make a swap file
 	if [[ -z $SWAP_FILE ]]
 	then
-		LOGGER "$(date +"%b %e %H:%M:%S"), PID $$: No swap file specified"
+		LOGGER "No swap file specified"
 	elif [[ ! -d `dirname $SWAP_FILE` ]]
 	then
 		#Directory for swap file does NOT exist
-		LOGGER "$(date +"%b %e %H:%M:%S"), PID $$: Swap directory ($(dirname $SWAP_FILE)) does not exist"'!'
+		LOGGER "Swap directory ($(dirname $SWAP_FILE)) does not exist"'!'
 	else
 		#Check if there is enough hard drive space
 		#to make a swap file
 		if [[ $FREE_HDD_SPACE_IN_MB -gt $MIN_SWAP_SIZE ]]
 		then
-			LOGGER "$(date +"%b %e %H:%M:%S"), PID $$: Creating swap file at $SWAP_FILE"
+			LOGGER "Creating swap file at $SWAP_FILE"
 
 			fallocate -l ${MIN_SWAP_SIZE}m ${SWAP_FILE} &&
 			mkswap ${SWAP_FILE} >/dev/null &&
@@ -145,14 +145,14 @@ CreateSwap()
 			#slightly less free swap than MIN_SWAP_SIZE
 			if [[ $FREE_SWAP -gt `expr $MIN_SWAP_SIZE - 100` ]]
 			then
-				LOGGER "$(date +"%b %e %H:%M:%S"), PID $$: Hibernating..."
+				LOGGER "Hibernating..."
 
 				#Change to the uswsusp way of hibernating,
 				#which allows for hibernating from a swap file
 				SHUTOFF_COMMAND=$(which s2disk)
 				return
 			else
-				LOGGER "$(date +"%b %e %H:%M:%S"), PID $$: Failed to create swap file"'!'
+				LOGGER "Failed to create swap file"'!'
 
 				#Undo what we did with swap file
 				if [[ -e $SWAP_FILE ]]
@@ -165,16 +165,16 @@ CreateSwap()
 			fi
 		else
 			#Not enough space on HDD for swap file
-			LOGGER "$(date +"%b %e %H:%M:%S"), PID $$: Not enough space on HDD (only ${FREE_HDD_SPACE_IN_MB}MB) for swap file of size ${MIN_SWAP_SIZE}MB"'!'
+			LOGGER "Not enough space on HDD (only ${FREE_HDD_SPACE_IN_MB}MB) for swap file of size ${MIN_SWAP_SIZE}MB"'!'
 		fi
 	fi
 
 	#If swap file creation was successful, we have already returned from this function.
 	#If we are at this stage however, something failed and we are going to fallback (suspend)
-	LOGGER "$(date +"%b %e %H:%M:%S"), PID $$: Going to fallback plan (suspend)"
+	LOGGER "Going to fallback plan (suspend)"
 	SHUTOFF_COMMAND=$(which pm-suspend)
 
-	LOGGER "$(date +"%b %e %H:%M:%S"), PID $$: Suspending..."
+	LOGGER "Suspending..."
 }
 
 #Make sure people read the INSTALL file and don't run the script without cron
@@ -191,17 +191,17 @@ uid=$(/usr/bin/id -u) && [ "$uid" = "0" ] ||
 #Make sure this script is not running already
 if [[ `pgrep -cf "/bin/bash [^ ]*$(basename $0)"` -gt 1 ]]
 then
-	LOGGER "$(date +"%b %e %H:%M:%S"), PID $$: script already running"
+	LOGGER "script already running"
 	exit 0
 fi
 
 #Check if upower is installed
-which upower &>/dev/null || { LOGGER "$(date +"%b %e %H:%M:%S"), PID $$: upower not installed. This script will NOT work without it"'!'; exit 1; }
+which upower &>/dev/null || { LOGGER "upower not installed. This script will NOT work without it"'!'; exit 1; }
 
 #Make sure swap file doesn't already exist, and isn't mounted
 if [[ `swapon -s | wc -l` -gt 1 ]]
 then
-	LOGGER "$(date +"%b %e %H:%M:%S"), PID $$: Old temporary swap file detected. Unmounting and removing..."
+	LOGGER "Old temporary swap file detected. Unmounting and removing..."
 
 	#Swap file exists, and is mounted
 	IFS=$'\n'
@@ -217,7 +217,7 @@ fi
 
 #Check if $SHUTOFF_COMMAND is an actual command
 #Ignore arguments to the command
-[[ -x $(echo "${SHUTOFF_COMMAND}" | sed 's/ .*//g') ]] || { LOGGER "$(date +"%b %e %H:%M:%S"), PID $$: $(echo ${SHUTOFF_COMMAND} | sed 's/ .*//g') is not a valid command"'!'; exit 1; }
+[[ -x $(echo "${SHUTOFF_COMMAND}" | sed 's/ .*//g') ]] || { LOGGER "$(echo ${SHUTOFF_COMMAND} | sed 's/ .*//g') is not a valid command"'!'; exit 1; }
 
 #This boolean variable is set to true if the BeforeHibernation code ran
 #indicating that the AfterHibernation code should run too
@@ -235,14 +235,14 @@ do
 		#Check if battery is below $BATTERY_THRESHOLD_IN_PERCENT
 		if [[ $(upower -d | grep percentage | grep -o '[0-9]*') -lt $BATTERY_THRESHOLD_IN_PERCENT ]]
 		then
-			LOGGER "$(date +"%b %e %H:%M:%S"), PID $$: UPS battery is below the ${BATTERY_THRESHOLD_IN_PERCENT}% threshold, and the UPS is still running on battery power."
+			LOGGER "UPS battery is below the ${BATTERY_THRESHOLD_IN_PERCENT}% threshold, and the UPS is still running on battery power."
 
 			#Only run pre-hibernation code if it hasn't already run
 			#This prevents it from running if machine already went into hibernation, woke up, realized we still have no power,
 			#and is going down again
 			if ! $PREHIB_RAN
 			then
-				LOGGER "$(date +"%b %e %H:%M:%S"), PID $$: Running pre-hibernation code..."
+				LOGGER "Running pre-hibernation code..."
 				#Run BeforeHibernation function
 				BeforeHibernation
 
@@ -279,31 +279,31 @@ do
 						#Check if we have more SWAP than RAM
 						if [[ $FREE_SWAP -gt $TOTAL_RAM ]]
 						then
-							LOGGER "$(date +"%b %e %H:%M:%S"), PID $$: Hibernating..."
+							LOGGER "Hibernating..."
 						else
-							LOGGER "$(date +"%b %e %H:%M:%S"), PID $$: Not enough free swap space to hibernate"'!'
-							LOGGER "$(date +"%b %e %H:%M:%S"), PID $$: Going to fallback plan (suspend)"
+							LOGGER "Not enough free swap space to hibernate"'!'
+							LOGGER "Going to fallback plan (suspend)"
 							SHUTOFF_COMMAND=$(which pm-suspend)
 
-							LOGGER "$(date +"%b %e %H:%M:%S"), PID $$: Suspending..."
+							LOGGER "Suspending..."
 						fi
 					fi
 				else
-					LOGGER "$(date +"%b %e %H:%M:%S"), PID $$: Hibernating..."
+					LOGGER "Hibernating..."
 				fi
 			elif echo $SHUTOFF_COMMAND | grep -q 'suspend$'
 			then
-				LOGGER "$(date +"%b %e %H:%M:%S"), PID $$: Suspending..."
+				LOGGER "Suspending..."
 			else
-				LOGGER "$(date +"%b %e %H:%M:%S"), PID $$: Running ${SHUTOFF_COMMAND}..."
+				LOGGER "Running ${SHUTOFF_COMMAND}..."
 			fi
 
 			#Hibernate
-			${SHUTOFF_COMMAND} || { LOGGER "$(date +"%b %e %H:%M:%S"), PID $$: Failed to run ${SHUTOFF_COMMAND}"'!'" Going to fallback plan (suspend)"; LOGGER "$(date +"%b %e %H:%M:%S"), PID $$: Suspending..."; SHUTOFF_COMMAND=$(which pm-suspend); ${SHUTOFF_COMMAND}; }
+			${SHUTOFF_COMMAND} || { LOGGER "Failed to run ${SHUTOFF_COMMAND}"'!'" Going to fallback plan (suspend)"; LOGGER "Suspending..."; SHUTOFF_COMMAND=$(which pm-suspend); ${SHUTOFF_COMMAND}; }
 
 			#After the computer wakes up, give upower 2 minutes to update its status to make sure it doesn't still say
 			#that the UPS is on battery power if it's not
-			LOGGER "$(date +"%b %e %H:%M:%S"), PID $$: Computer just woke up. Waiting up to 120s for update to battery status"
+			LOGGER "Computer just woke up. Waiting up to 120s for update to battery status"
 			for VAR in {1..120}
 			do
 				sleep 1
@@ -313,19 +313,19 @@ do
 			#Check if UPS has power again
 			if [[ $(upower -d | grep on-battery | grep -o "yes\|no") == "no" ]]
 			then
-				LOGGER "$(date +"%b %e %H:%M:%S"), PID $$: Power restored"
+				LOGGER "Power restored"
 				break
 			else
-				LOGGER "$(date +"%b %e %H:%M:%S"), PID $$: UPS still running off of battery. If it doesn't come back online in 30 seconds, the computer is going into hibernation again as soon as it's below the threshold."
+				LOGGER "UPS still running off of battery. If it doesn't come back online in 30 seconds, the computer is going into hibernation again as soon as it's below the threshold."
 				#Give it another 30 seconds, and run the while loop again
 				sleep 30
 			fi
 		else
-			LOGGER "$(date +"%b %e %H:%M:%S"), PID $$: battery is still above the ${BATTERY_THRESHOLD_IN_PERCENT}% threshold. Waiting 30 seconds..."
+			LOGGER "battery is still above the ${BATTERY_THRESHOLD_IN_PERCENT}% threshold. Waiting 30 seconds..."
 			sleep 30
 		fi
 	else
-		LOGGER "$(date +"%b %e %H:%M:%S"), PID $$: Power restored before hibernation could take place"
+		LOGGER "Power restored before hibernation could take place"
 		break
 	fi
 done
@@ -335,19 +335,19 @@ if $PREHIB_RAN
 then
 	#Run AfterHibernation function
 	AfterHibernation
-	LOGGER "$(date +"%b %e %H:%M:%S"), PID $$: post-hibernation code execution complete"
+	LOGGER "post-hibernation code execution complete"
 fi
 
 #Check if we should remove SWAP_FILE
 if [[ -e $SWAP_FILE ]]
 then
-	LOGGER "$(date +"%b %e %H:%M:%S"), PID $$: Removing temp swap file..."
+	LOGGER "Removing temp swap file..."
 	swapoff $SWAP_FILE &&
 	rm -f $SWAP_FILE
 	sed -i '\#$SWAP_FILE#d' /etc/fstab
 	sed -i '/resume offset =/d' /etc/uswsusp.conf
 fi
 
-LOGGER "$(date +"%b %e %H:%M:%S"), PID $$: Exiting..."
+LOGGER "Exiting..."
 
 exit 0
