@@ -206,6 +206,9 @@ fi
 #indicating that the AfterHibernation code should run too
 PREHIB_RAN=false
 
+#This boolean variable is set to true when the CreateSwap code ran
+SWAP_CREATED=false
+
 #Keep checking the UPS status until power returns to it
 while [[ true ]]
 do
@@ -238,29 +241,38 @@ do
 				#we are doing a suspend and hibernate with s2both
 			if echo $SHUTOFF_COMMAND | grep -q hibernate || echo $SHUTOFF_COMMAND | grep -q s2disk || echo $SHUTOFF_COMMAND | grep -q s2both || echo $SHUTOFF_COMMAND | grep -q hybrid
 			then
-				#Check if we should make a swap file
-				if $ENABLE_SWAP
+				#If this is the second time we're doing this (we just woke up and are going down again),
+				#ignore creating a swap file. This already either succeeded and we have a swap file, or failed
+				#and we don't
+				if ! $SWAP_CREATED
 				then
-					CreateSwap
-				else
-					#Check if we have enough swap to hibernate
-					#Check how much swap we have now
-					FREE_SWAP=$(free -m | grep Swap | tr -s ' ' | cut -d ' ' -f 4)
-
-					#Check how much ram we have now
-					TOTAL_RAM=$(free -m | grep Mem | tr -s ' ' | cut -d ' ' -f 2)
-
-					#Check if we have more SWAP than RAM
-					if [[ $FREE_SWAP -gt $TOTAL_RAM ]]
+					#Check if we should make a swap file
+					if $ENABLE_SWAP
 					then
-						echo "$(date +"%b %e %H:%M:%S"), PID $$: Hibernating..." >> $LOG	
+						CreateSwap
+						SWAP_CREATED=true
 					else
-						echo "$(date +"%b %e %H:%M:%S"), PID $$: Not enough free swap space to hibernate"'!' | tee -a $LOG
-						echo "$(date +"%b %e %H:%M:%S"), PID $$: Going to fallback plan (suspend)" | tee -a $LOG
-						SHUTOFF_COMMAND=$(which pm-suspend)
+						#Check if we have enough swap to hibernate
+						#Check how much swap we have now
+						FREE_SWAP=$(free -m | grep Swap | tr -s ' ' | cut -d ' ' -f 4)
 
-						echo "$(date +"%b %e %H:%M:%S"), PID $$: Suspending..." >> $LOG
+						#Check how much ram we have now
+						TOTAL_RAM=$(free -m | grep Mem | tr -s ' ' | cut -d ' ' -f 2)
+
+						#Check if we have more SWAP than RAM
+						if [[ $FREE_SWAP -gt $TOTAL_RAM ]]
+						then
+							echo "$(date +"%b %e %H:%M:%S"), PID $$: Hibernating..." >> $LOG	
+						else
+							echo "$(date +"%b %e %H:%M:%S"), PID $$: Not enough free swap space to hibernate"'!' | tee -a $LOG
+							echo "$(date +"%b %e %H:%M:%S"), PID $$: Going to fallback plan (suspend)" | tee -a $LOG
+							SHUTOFF_COMMAND=$(which pm-suspend)
+
+							echo "$(date +"%b %e %H:%M:%S"), PID $$: Suspending..." >> $LOG
+						fi
 					fi
+				else
+					echo "$(date +"%b %e %H:%M:%S"), PID $$: Hibernating..." >> $LOG	
 				fi
 			elif echo $SHUTOFF_COMMAND | grep -q 'suspend$'
 			then
