@@ -215,12 +215,20 @@ do
 		#Check if battery is below $BATTERY_THRESHOLD_IN_PERCENT
 		if [[ $(upower -d | grep percentage | grep -o '[0-9]*') -lt $BATTERY_THRESHOLD_IN_PERCENT ]]
 		then
-			echo "$(date +"%b %e %H:%M:%S"), PID $$: UPS battery is below the ${BATTERY_THRESHOLD_IN_PERCENT}% threshold, and the UPS is still running on battery power. Running pre-hibernation code..." >> $LOG
-	                #Run BeforeHibernation function
-	                BeforeHibernation
+			echo "$(date +"%b %e %H:%M:%S"), PID $$: UPS battery is below the ${BATTERY_THRESHOLD_IN_PERCENT}% threshold, and the UPS is still running on battery power." >> $LOG
 
-			#Set PREHIB_RAN variable to true to indicate the BeforeHibernation function ran
-			PREHIB_RAN=true
+			#Only run pre-hibernation code if it hasn't already run
+			#This prevents it from running if machine already went into hibernation, woke up, realized we still have no power,
+			#and is going down again
+			if ! $PREHIB_RAN
+			then
+				echo "$(date +"%b %e %H:%M:%S"), PID $$: Running pre-hibernation code..." >> $LOG
+				#Run BeforeHibernation function
+				BeforeHibernation
+
+				#Set PREHIB_RAN variable to true to indicate the BeforeHibernation function ran
+				PREHIB_RAN=true
+			fi
 
 			#Check if we are hibernating, suspening, or something else
 			#Swap needs to be dealt with in cases where:
