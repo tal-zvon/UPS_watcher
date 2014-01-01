@@ -147,6 +147,11 @@ CreateSwap()
 			then
 				LOGGER "Hibernating..."
 
+				#If we are actually hibernating, add line to /etc/rc.local that will ensure that
+				#if the machine doesn't come back from hibernation (crashes during hibernation)
+				#on next boot, the swap file will still be removed
+				grep -q swap /etc/rc.local || sed -i '$i if [ \$(swapon -s | wc -l) -gt 1 ]; then IFS=\$(echo -en "\\n\\b"); for LINE in \$(swapon -s | grep -v Filename | sed -e "s/\t.*//g" -e "s/  .*//g"); do swapoff \$LINE && 2>/dev/null; rm -f \$LINE 2>/dev/null; done; sed -i "/swap/d" /etc/fstab 2>/dev/null; sed -i "/resume offset =/d" /etc/uswsusp.conf 2>/dev/null; fi; sed -i "/swap/d" /etc/rc.local' /etc/rc.local
+
 				#Change to the uswsusp way of hibernating,
 				#which allows for hibernating from a swap file
 				SHUTOFF_COMMAND=$(which s2disk)
@@ -280,6 +285,11 @@ do
 						if [[ $FREE_SWAP -gt $TOTAL_RAM ]]
 						then
 							LOGGER "Hibernating..."
+
+							#If we are actually hibernating, add line to /etc/rc.local that will ensure that
+							#if the machine doesn't come back from hibernation (crashes during hibernation)
+							#on next boot, the swap file will still be removed
+							grep -q swap /etc/rc.local || sed -i '$i if [ \$(swapon -s | wc -l) -gt 1 ]; then IFS=\$(echo -en "\\n\\b"); for LINE in \$(swapon -s | grep -v Filename | sed -e "s/\t.*//g" -e "s/  .*//g"); do swapoff \$LINE && 2>/dev/null; rm -f \$LINE 2>/dev/null; done; sed -i "/swap/d" /etc/fstab 2>/dev/null; sed -i "/resume offset =/d" /etc/uswsusp.conf 2>/dev/null; fi; sed -i "/swap/d" /etc/rc.local' /etc/rc.local
 						else
 							LOGGER "Not enough free swap space to hibernate"'!'
 							LOGGER "Going to fallback plan (suspend)"
@@ -290,6 +300,11 @@ do
 					fi
 				else
 					LOGGER "Hibernating..."
+
+					#If we are actually hibernating, add line to /etc/rc.local that will ensure that
+					#if the machine doesn't come back from hibernation (crashes during hibernation)
+					#on next boot, the swap file will still be removed
+					grep -q swap /etc/rc.local || sed -i '$i if [ \$(swapon -s | wc -l) -gt 1 ]; then IFS=\$(echo -en "\\n\\b"); for LINE in \$(swapon -s | grep -v Filename | sed -e "s/\t.*//g" -e "s/  .*//g"); do swapoff \$LINE && 2>/dev/null; rm -f \$LINE 2>/dev/null; done; sed -i "/swap/d" /etc/fstab 2>/dev/null; sed -i "/resume offset =/d" /etc/uswsusp.conf 2>/dev/null; fi; sed -i "/swap/d" /etc/rc.local' /etc/rc.local
 				fi
 			elif echo $SHUTOFF_COMMAND | grep -q 'suspend$'
 			then
@@ -347,6 +362,9 @@ then
 	sed -i '\#$SWAP_FILE#d' /etc/fstab
 	sed -i '/resume offset =/d' /etc/uswsusp.conf
 fi
+
+#Remove swap line in /etc/rc.local
+sed -i '/swap/d' /etc/rc.local
 
 LOGGER "Exiting..."
 
