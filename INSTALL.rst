@@ -81,8 +81,8 @@ To do this:
 Stop the kernel from using the swap file for swapping::
 	sudo sysctl -w vm.swappiness=1 
 	echo vm.swappiness=1 | sudo tee -a /etc/sysctl.d/local.conf
-Install uswsusp::
-	sudo apt-get install uswsusp
+Install hibernate and uswsusp::
+	sudo apt-get install hibernate uswsusp
 	NOTE: If it asks "Continue without a valid swap space?" - answer yes
 Edit /etc/default/grub::
 	Add 'resume=/dev/sda1' to GRUB_CMDLINE_LINUX_DEFAULT

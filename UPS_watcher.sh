@@ -152,9 +152,10 @@ CreateSwap()
 				#on next boot, the swap file will still be removed
 				grep -q swap /etc/rc.local || sed -i '$i if [ \$(swapon -s | wc -l) -gt 1 ]; then IFS=\$(echo -en "\\n\\b"); for LINE in \$(swapon -s | grep -v Filename | sed -e "s/\t.*//g" -e "s/  .*//g"); do swapoff \$LINE && 2>/dev/null; rm -f \$LINE 2>/dev/null; done; sed -i "/swap/d" /etc/fstab 2>/dev/null; sed -i "/resume offset =/d" /etc/uswsusp.conf 2>/dev/null; fi; sed -i "/swap/d" /etc/rc.local' /etc/rc.local
 
-				#Change to the uswsusp way of hibernating,
-				#which allows for hibernating from a swap file
-				SHUTOFF_COMMAND=$(which s2disk)
+				#pm-hibernate does NOT support swap files. If pm-hibernate or pm-suspend-both is
+				#being used, change to the uswsusp way of hibernating which allows for hibernating
+				#from a swap file
+				echo $SHUTOFF_COMMAND | grep -q 'pm-' && SHUTOFF_COMMAND=$(which hibernate 2>/dev/null || which s2disk)
 				return
 			else
 				LOGGER "Failed to create swap file"'!'
@@ -259,6 +260,7 @@ do
 			#Swap needs to be dealt with in cases where:
 				#we are hibernating with pm-hibernate
 				#we are hibernating with s2disk
+				#we are hibernating with /usr/sbin/hibernate script (uses uswsusp)
 				#we are doing a suspend and hibernate with pm-suspend-hybrid
 				#we are doing a suspend and hibernate with s2both
 			if echo $SHUTOFF_COMMAND | grep -q hibernate || echo $SHUTOFF_COMMAND | grep -q s2disk || echo $SHUTOFF_COMMAND | grep -q s2both || echo $SHUTOFF_COMMAND | grep -q hybrid
