@@ -56,7 +56,6 @@ LOGGER()
 	else
 		echo "$(date +"%b %e %H:%M:%S"), PID $$: $@" | tee -a $LOG
 	fi
-
 }
 
 #Create swap file
@@ -183,6 +182,90 @@ CreateSwap()
 	LOGGER "Suspending..."
 }
 
+#Make sure swap file doesn't already exist, and isn't mounted
+DEL_SWAP_FILES()
+{
+	SWAP_FOUND=false
+
+	if [[ `swapon -s | wc -l` -gt 1 ]]
+	then
+		#Swap file exists, and is mounted
+		IFS=$'\n'
+		for LINE in $(swapon -s | grep -v Filename | sed -e 's/\t.*//g' -e 's/  .*//g')
+		do
+			#Make sure it is a swap file and not a swap partition
+			#before unmounting and attempting to delete
+			if file $LINE | grep -q 'swap file'
+			then
+				#Indicate that we found a mounted swap file
+				SWAP_FOUND=true
+
+				swapoff $LINE 2>/dev/null &&
+				rm -f $LINE 2>/dev/null
+			fi
+		done
+	fi
+
+	#Check if the swap file exists (if it wasn't mounted)
+	if [[ -n $SWAP_FILE ]] && [[ -e $SWAP_FILE ]]
+	then
+		#Make sure it didn't just fail to swapoff earlier
+		if ! swapon -s | grep -v Filename | sed -e 's/\t.*//g' -e 's/  .*//g' | grep -q "^${SWAP_FILE}$"
+		then
+			#Indicate that we found a mounted swap file
+			SWAP_FOUND=true
+
+			#Remove it
+			rm -f "${SWAP_FILE}"
+		fi
+	fi
+
+	#Check if there's a record of a swap file in fstab
+	#Swap file exists, and is mounted
+	IFS=$'\n'
+	for LINE in $(grep -v '^#' /etc/fstab | cut -d ' ' -f 1 | sed 's#\\040# #g' | sed -e 's/\t.*//g' -e 's/  .*//g')
+	do
+		if [[ -e "$LINE" ]] && file "$LINE" | grep -q 'swap file'
+		then
+			#Check if $LINE is mounted
+			#We trust that all active swap files that could be removed have
+			#already been up above. This is only in case the above swapoff failed
+			#If a swap file/partition did fail to be swapped off, it may be used
+			#by the system to store part of the hibernation data, in which case,
+			#we should definately NOT remove it from fstab, so that when the machine
+			#wakes up, it mounts that swap file/partition again
+			if ! swapon -s | grep -v Filename | sed -e 's/\t.*//g' -e 's/  .*//g' | grep -q "^${LINE}$"
+			then
+				#Indicate that we found a swap file in fstab that exists, but
+				#is NOT mounted
+				SWAP_FOUND=true
+
+				#REMOVE
+				rm -f "$LINE"
+
+				#Remove line from fstab
+				LINE=$(echo "$LINE" | sed 's# #\\\\040#g')
+				sed -i -e "\#$LINE\t#d" -e "\#$LINE  #d" /etc/fstab
+			else
+				LOGGER "$LINE is still mounted"'!'
+			fi
+		fi
+	done
+
+	#Check if there's a resume offset in uswsusp.conf
+	if grep -q 'resume offset' /etc/uswsusp.conf 2>/dev/null
+	then
+			#Indicate that we found a mounted swap file
+			SWAP_FOUND=true
+
+			#Remove the line from uswsusp.conf
+			sed -i '/resume offset =/d' /etc/uswsusp.conf 2>/dev/null
+	fi
+	
+	#Indicate if a swap file was found
+	return $(${SWAP_FOUND})
+}
+
 #Make sure people read the INSTALL file and don't run the script without cron
 if [[ "$@" != "--cron" ]]
 then
@@ -205,21 +288,7 @@ fi
 which upower &>/dev/null || { LOGGER "upower not installed. This script will NOT work without it"'!'; exit 1; }
 
 #Make sure swap file doesn't already exist, and isn't mounted
-if [[ `swapon -s | wc -l` -gt 1 ]]
-then
-	LOGGER "Old temporary swap file detected. Unmounting and removing..."
-
-	#Swap file exists, and is mounted
-	IFS=$'\n'
-	for LINE in $(swapon -s | grep -v Filename | sed -e 's/\t.*//g' -e 's/  .*//g')
-	do
-		swapoff $LINE && 2>/dev/null
-		rm -f $LINE 2>/dev/null
-	done
-
-	sed -i '/swap/d' /etc/fstab 2>/dev/null
-	sed -i '/resume offset =/d' /etc/uswsusp.conf 2>/dev/null
-fi
+DEL_SWAP_FILES && LOGGER "Old temporary swap file detected. Unmounting and removing..."
 
 #Check if $SHUTOFF_COMMAND is an actual command
 #Ignore arguments to the command
@@ -356,14 +425,7 @@ then
 fi
 
 #Check if we should remove SWAP_FILE
-if [[ -e $SWAP_FILE ]]
-then
-	LOGGER "Removing temp swap file..."
-	swapoff $SWAP_FILE &&
-	rm -f $SWAP_FILE
-	sed -i '\#$SWAP_FILE#d' /etc/fstab
-	sed -i '/resume offset =/d' /etc/uswsusp.conf
-fi
+DEL_SWAP_FILES && LOGGER "Removing temp swap file..."
 
 #Remove swap line in /etc/rc.local
 sed -i '/swap/d' /etc/rc.local
