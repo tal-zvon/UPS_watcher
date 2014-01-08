@@ -288,7 +288,7 @@ fi
 which upower &>/dev/null || { LOGGER "upower not installed. This script will NOT work without it"'!'; exit 1; }
 
 #Make sure swap file doesn't already exist, and isn't mounted
-DEL_SWAP_FILES && LOGGER "Old temporary swap file detected. Unmounting and removing..."
+DEL_SWAP_FILES && LOGGER "Old temporary swap file detected. It has been unmounted and removed..."
 
 #Check if $SHUTOFF_COMMAND is an actual command
 #Ignore arguments to the command
