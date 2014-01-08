@@ -435,7 +435,7 @@ then
 fi
 
 #Check if we should remove SWAP_FILE
-DEL_SWAP_FILES && LOGGER "Removing temp swap file..."
+DEL_SWAP_FILES && LOGGER "Old temp swap file removed..."
 
 LOGGER "Exiting..."
 
