@@ -261,6 +261,16 @@ DEL_SWAP_FILES()
 			#Remove the line from uswsusp.conf
 			sed -i '/resume offset =/d' /etc/uswsusp.conf 2>/dev/null
 	fi
+
+	#Remove swap line in /etc/rc.local, if it's there
+	if grep -q 'swap' /etc/rc.local 2>/dev/null
+	then
+		#Indicate that we found a swap line in rc.local
+		SWAP_FOUND=true
+
+		#Remove swap line
+		sed -i '/swap/d' /etc/rc.local
+	fi
 	
 	#Indicate if a swap file was found
 	return $(${SWAP_FOUND})
@@ -426,9 +436,6 @@ fi
 
 #Check if we should remove SWAP_FILE
 DEL_SWAP_FILES && LOGGER "Removing temp swap file..."
-
-#Remove swap line in /etc/rc.local
-sed -i '/swap/d' /etc/rc.local
 
 LOGGER "Exiting..."
 
