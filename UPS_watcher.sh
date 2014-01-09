@@ -78,7 +78,6 @@ CreateSwap()
 
 		#Log that we are suspending
 		SuspendFallback
-
 		return
 	fi
 
@@ -117,10 +116,16 @@ CreateSwap()
 	if [[ -z $SWAP_FILE ]]
 	then
 		LOGGER "No swap file specified"
+		#Switch SHUTOFF_COMMAND to suspend
+		SuspendFallback
+		return
 	elif [[ ! -d `dirname $SWAP_FILE` ]]
 	then
 		#Directory for swap file does NOT exist
 		LOGGER "Swap directory ($(dirname $SWAP_FILE)) does not exist"'!'
+		#Switch SHUTOFF_COMMAND to suspend
+		SuspendFallback
+		return
 	else
 		#Check if there is enough hard drive space
 		#to make a swap file
@@ -134,11 +139,13 @@ CreateSwap()
 			swapon ${SWAP_FILE} &&
 			if [[ -e /etc/uswsusp.conf ]]
 			then
-				#Update 'resume offset'
+				#uswsusp.conf exists. Update its 'resume offset'
 				sed -i '/resume offset =/d' /etc/uswsusp.conf
 				swap-offset ${SWAP_FILE} >> /etc/uswsusp.conf
 				dpkg-reconfigure -fnoninteractive uswsusp &>/dev/null
 			else
+				#uswsusp.conf doesn't exist. Let dpkg-reconfigure create it
+				#then update its 'resume offset'
 				dpkg-reconfigure -fnoninteractive uswsusp &>/dev/null
 				#Update 'resume offset'
 				sed -i '/resume offset =/d' /etc/uswsusp.conf
@@ -171,15 +178,17 @@ CreateSwap()
 				#Undo what we did with swap file
 				if [[ -e $SWAP_FILE ]]
 				then
-					swapoff $SWAP_FILE 2>/dev/null &&
-					rm -f $SWAP_FILE
-					sed -i '\#$SWAP_FILE#d' /etc/fstab
-					sed -i '/resume offset =/d' /etc/uswsusp.conf
+					#Change SHUTOFF_COMMAND to suspend
+					SuspendFallback
+					return
 				fi
 			fi
 		else
 			#Not enough space on HDD for swap file
 			LOGGER "Not enough space on HDD (only ${FREE_HDD_SPACE_IN_MB}MB) for swap file of size ${MIN_SWAP_SIZE}MB"'!'
+			#Change SHUTOFF_COMMAND to suspend
+			SuspendFallback
+			return
 		fi
 	fi
 
