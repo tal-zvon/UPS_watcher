@@ -58,6 +58,16 @@ LOGGER()
 	fi
 }
 
+#Log that we are suspending instead of doing what they asked for
+#and change SHUTOFF_COMMAND to suspend
+SuspendFallback()
+{
+	LOGGER "Going to fallback plan (suspend)"
+
+	SHUTOFF_COMMAND=$(which pm-suspend)
+	LOGGER "Suspending..."
+}
+
 #Create swap file
 CreateSwap()
 {
@@ -65,10 +75,9 @@ CreateSwap()
 	if ! type s2disk &>/dev/null
 	then
 		LOGGER "uswsusp does not appear to be installed. Cannot hibernate from swap image without it"'!'" See INSTALL.rst"
-		LOGGER "Going to fallback plan (suspend)"
 
-		SHUTOFF_COMMAND=$(which pm-suspend)
-		LOGGER "Suspending..."
+		#Log that we are suspending
+		SuspendFallback
 
 		return
 	fi
@@ -176,10 +185,7 @@ CreateSwap()
 
 	#If swap file creation was successful, we have already returned from this function.
 	#If we are at this stage however, something failed and we are going to fallback (suspend)
-	LOGGER "Going to fallback plan (suspend)"
-	SHUTOFF_COMMAND=$(which pm-suspend)
-
-	LOGGER "Suspending..."
+	SuspendFallback
 }
 
 #Make sure swap file doesn't already exist, and isn't mounted
@@ -373,10 +379,8 @@ do
 							grep -q swap /etc/rc.local || sed -i '$i if [ \$(swapon -s | wc -l) -gt 1 ]; then IFS=\$(echo -en "\\n\\b"); for LINE in \$(swapon -s | grep -v Filename | sed -e "s/\t.*//g" -e "s/  .*//g"); do swapoff \$LINE && 2>/dev/null; rm -f \$LINE 2>/dev/null; done; sed -i "/swap/d" /etc/fstab 2>/dev/null; sed -i "/resume offset =/d" /etc/uswsusp.conf 2>/dev/null; fi; sed -i "/swap/d" /etc/rc.local' /etc/rc.local
 						else
 							LOGGER "Not enough free swap space to hibernate"'!'
-							LOGGER "Going to fallback plan (suspend)"
-							SHUTOFF_COMMAND=$(which pm-suspend)
-
-							LOGGER "Suspending..."
+							#Log that we are suspending
+							SuspendFallback
 						fi
 					fi
 				else
@@ -395,7 +399,7 @@ do
 			fi
 
 			#Hibernate
-			${SHUTOFF_COMMAND} || { LOGGER "Failed to run ${SHUTOFF_COMMAND}"'!'" Going to fallback plan (suspend)"; LOGGER "Suspending..."; SHUTOFF_COMMAND=$(which pm-suspend); ${SHUTOFF_COMMAND}; }
+			${SHUTOFF_COMMAND} || { LOGGER "Failed to run ${SHUTOFF_COMMAND}"'!'; SuspendFallback; ${SHUTOFF_COMMAND}; }
 
 			#After the computer wakes up, give upower 2 minutes to update its status to make sure it doesn't still say
 			#that the UPS is on battery power if it's not
