@@ -176,12 +176,11 @@ CreateSwap()
 				LOGGER "Failed to create swap file"'!'
 
 				#Undo what we did with swap file
-				if [[ -e $SWAP_FILE ]]
-				then
-					#Change SHUTOFF_COMMAND to suspend
-					SuspendFallback
-					return
-				fi
+				DEL_SWAP_FILES
+
+				#Change SHUTOFF_COMMAND to suspend
+				SuspendFallback
+				return
 			fi
 		else
 			#Not enough space on HDD for swap file
