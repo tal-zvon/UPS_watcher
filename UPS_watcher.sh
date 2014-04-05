@@ -1,5 +1,7 @@
 #!/bin/bash
 
+export PATH='/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+
 ##################################
 ######USER EDITABLE SECTION#######
 ##################################
@@ -56,7 +58,16 @@ LOGGER()
 	else
 		echo "$(date +"%b %e %H:%M:%S"), PID $$: $@" | tee -a $LOG
 	fi
+}
 
+#Log that we are suspending instead of doing what they asked for
+#and change SHUTOFF_COMMAND to suspend
+SuspendFallback()
+{
+	LOGGER "Going to fallback plan (suspend)"
+
+	SHUTOFF_COMMAND=$(which pm-suspend)
+	LOGGER "Suspending..."
 }
 
 #Create swap file
@@ -66,11 +77,9 @@ CreateSwap()
 	if ! type s2disk &>/dev/null
 	then
 		LOGGER "uswsusp does not appear to be installed. Cannot hibernate from swap image without it"'!'" See INSTALL.rst"
-		LOGGER "Going to fallback plan (suspend)"
 
-		SHUTOFF_COMMAND=$(which pm-suspend)
-		LOGGER "Suspending..."
-
+		#Log that we are suspending
+		SuspendFallback
 		return
 	fi
 
@@ -109,10 +118,16 @@ CreateSwap()
 	if [[ -z $SWAP_FILE ]]
 	then
 		LOGGER "No swap file specified"
+		#Switch SHUTOFF_COMMAND to suspend
+		SuspendFallback
+		return
 	elif [[ ! -d `dirname $SWAP_FILE` ]]
 	then
 		#Directory for swap file does NOT exist
 		LOGGER "Swap directory ($(dirname $SWAP_FILE)) does not exist"'!'
+		#Switch SHUTOFF_COMMAND to suspend
+		SuspendFallback
+		return
 	else
 		#Check if there is enough hard drive space
 		#to make a swap file
@@ -126,11 +141,13 @@ CreateSwap()
 			swapon ${SWAP_FILE} &&
 			if [[ -e /etc/uswsusp.conf ]]
 			then
-				#Update 'resume offset'
+				#uswsusp.conf exists. Update its 'resume offset'
 				sed -i '/resume offset =/d' /etc/uswsusp.conf
 				swap-offset ${SWAP_FILE} >> /etc/uswsusp.conf
 				dpkg-reconfigure -fnoninteractive uswsusp &>/dev/null
 			else
+				#uswsusp.conf doesn't exist. Let dpkg-reconfigure create it
+				#then update its 'resume offset'
 				dpkg-reconfigure -fnoninteractive uswsusp &>/dev/null
 				#Update 'resume offset'
 				sed -i '/resume offset =/d' /etc/uswsusp.conf
@@ -161,26 +178,118 @@ CreateSwap()
 				LOGGER "Failed to create swap file"'!'
 
 				#Undo what we did with swap file
-				if [[ -e $SWAP_FILE ]]
-				then
-					swapoff $SWAP_FILE 2>/dev/null &&
-					rm -f $SWAP_FILE
-					sed -i '\#$SWAP_FILE#d' /etc/fstab
-					sed -i '/resume offset =/d' /etc/uswsusp.conf
-				fi
+				DEL_SWAP_FILES
+
+				#Change SHUTOFF_COMMAND to suspend
+				SuspendFallback
+				return
 			fi
 		else
 			#Not enough space on HDD for swap file
 			LOGGER "Not enough space on HDD (only ${FREE_HDD_SPACE_IN_MB}MB) for swap file of size ${MIN_SWAP_SIZE}MB"'!'
+			#Change SHUTOFF_COMMAND to suspend
+			SuspendFallback
+			return
 		fi
 	fi
 
 	#If swap file creation was successful, we have already returned from this function.
 	#If we are at this stage however, something failed and we are going to fallback (suspend)
-	LOGGER "Going to fallback plan (suspend)"
-	SHUTOFF_COMMAND=$(which pm-suspend)
+	SuspendFallback
+}
 
-	LOGGER "Suspending..."
+#Make sure swap file doesn't already exist, and isn't mounted
+DEL_SWAP_FILES()
+{
+	SWAP_FOUND=false
+
+	if [[ `swapon -s | wc -l` -gt 1 ]]
+	then
+		#Swap file exists, and is mounted
+		IFS=$'\n'
+		for LINE in $(swapon -s | grep -v Filename | sed -e 's/\t.*//g' -e 's/  .*//g')
+		do
+			#Make sure it is a swap file and not a swap partition
+			#before unmounting and attempting to delete
+			if file $LINE | grep -q 'swap file'
+			then
+				#Indicate that we found a mounted swap file
+				SWAP_FOUND=true
+
+				swapoff $LINE 2>/dev/null &&
+				rm -f $LINE 2>/dev/null
+			fi
+		done
+	fi
+
+	#Check if the swap file exists (if it wasn't mounted)
+	if [[ -n $SWAP_FILE ]] && [[ -e $SWAP_FILE ]]
+	then
+		#Make sure it didn't just fail to swapoff earlier
+		if ! swapon -s | grep -v Filename | sed -e 's/\t.*//g' -e 's/  .*//g' | grep -q "^${SWAP_FILE}$"
+		then
+			#Indicate that we found a mounted swap file
+			SWAP_FOUND=true
+
+			#Remove it
+			rm -f "${SWAP_FILE}"
+		fi
+	fi
+
+	#Check if there's a record of a swap file in fstab
+	#Swap file exists, and is mounted
+	IFS=$'\n'
+	for LINE in $(grep -v '^#' /etc/fstab | cut -d ' ' -f 1 | sed 's#\\040# #g' | sed -e 's/\t.*//g' -e 's/  .*//g')
+	do
+		if [[ -e "$LINE" ]] && file "$LINE" | grep -q 'swap file'
+		then
+			#Check if $LINE is mounted
+			#We trust that all active swap files that could be removed have
+			#already been up above. This is only in case the above swapoff failed
+			#If a swap file/partition did fail to be swapped off, it may be used
+			#by the system to store part of the hibernation data, in which case,
+			#we should definately NOT remove it from fstab, so that when the machine
+			#wakes up, it mounts that swap file/partition again
+			if ! swapon -s | grep -v Filename | sed -e 's/\t.*//g' -e 's/  .*//g' | grep -q "^${LINE}$"
+			then
+				#Indicate that we found a swap file in fstab that exists, but
+				#is NOT mounted
+				SWAP_FOUND=true
+
+				#REMOVE
+				rm -f "$LINE"
+
+				#Remove line from fstab
+				LINE=$(echo "$LINE" | sed 's# #\\\\040#g')
+				sed -i -e "\#$LINE\t#d" -e "\#$LINE  #d" /etc/fstab
+			else
+				LOGGER "$LINE is still mounted"'!'
+			fi
+		fi
+	done
+
+	#Check if there's a resume offset in uswsusp.conf
+	if grep -q 'resume offset' /etc/uswsusp.conf 2>/dev/null
+	then
+			#Indicate that we found a mounted swap file
+			SWAP_FOUND=true
+
+			#Remove the line from uswsusp.conf
+			sed -i '/resume offset =/d' /etc/uswsusp.conf 2>/dev/null
+	fi
+
+	#Remove swap line in /etc/rc.local, if it's there
+	if grep -q 'swap' /etc/rc.local 2>/dev/null
+	then
+		#Indicate that we found a swap line in rc.local
+		SWAP_FOUND=true
+
+		#Remove swap line
+		sed -i '/swap/d' /etc/rc.local
+	fi
+	
+	#Indicate if a swap file was found
+	return $(${SWAP_FOUND})
 }
 
 #Make sure people read the INSTALL file and don't run the script without cron
@@ -205,21 +314,7 @@ fi
 which upower &>/dev/null || { LOGGER "upower not installed. This script will NOT work without it"'!'; exit 1; }
 
 #Make sure swap file doesn't already exist, and isn't mounted
-if [[ `swapon -s | wc -l` -gt 1 ]]
-then
-	LOGGER "Old temporary swap file detected. Unmounting and removing..."
-
-	#Swap file exists, and is mounted
-	IFS=$'\n'
-	for LINE in $(swapon -s | grep -v Filename | sed -e 's/\t.*//g' -e 's/  .*//g')
-	do
-		swapoff $LINE && 2>/dev/null
-		rm -f $LINE 2>/dev/null
-	done
-
-	sed -i '/swap/d' /etc/fstab 2>/dev/null
-	sed -i '/resume offset =/d' /etc/uswsusp.conf 2>/dev/null
-fi
+DEL_SWAP_FILES && LOGGER "Old temporary swap file detected. It has been unmounted and removed..."
 
 #Check if $SHUTOFF_COMMAND is an actual command
 #Ignore arguments to the command
@@ -294,10 +389,8 @@ do
 							grep -q swap /etc/rc.local || sed -i '$i if [ \$(swapon -s | wc -l) -gt 1 ]; then IFS=\$(echo -en "\\n\\b"); for LINE in \$(swapon -s | grep -v Filename | sed -e "s/\t.*//g" -e "s/  .*//g"); do swapoff \$LINE && 2>/dev/null; rm -f \$LINE 2>/dev/null; done; sed -i "/swap/d" /etc/fstab 2>/dev/null; sed -i "/resume offset =/d" /etc/uswsusp.conf 2>/dev/null; fi; sed -i "/swap/d" /etc/rc.local' /etc/rc.local
 						else
 							LOGGER "Not enough free swap space to hibernate"'!'
-							LOGGER "Going to fallback plan (suspend)"
-							SHUTOFF_COMMAND=$(which pm-suspend)
-
-							LOGGER "Suspending..."
+							#Log that we are suspending
+							SuspendFallback
 						fi
 					fi
 				else
@@ -316,7 +409,7 @@ do
 			fi
 
 			#Hibernate
-			${SHUTOFF_COMMAND} || { LOGGER "Failed to run ${SHUTOFF_COMMAND}"'!'" Going to fallback plan (suspend)"; LOGGER "Suspending..."; SHUTOFF_COMMAND=$(which pm-suspend); ${SHUTOFF_COMMAND}; }
+			${SHUTOFF_COMMAND} || { LOGGER "Failed to run ${SHUTOFF_COMMAND}"'!'; SuspendFallback; ${SHUTOFF_COMMAND}; }
 
 			#After the computer wakes up, give upower 2 minutes to update its status to make sure it doesn't still say
 			#that the UPS is on battery power if it's not
@@ -356,17 +449,7 @@ then
 fi
 
 #Check if we should remove SWAP_FILE
-if [[ -e $SWAP_FILE ]]
-then
-	LOGGER "Removing temp swap file..."
-	swapoff $SWAP_FILE &&
-	rm -f $SWAP_FILE
-	sed -i '\#$SWAP_FILE#d' /etc/fstab
-	sed -i '/resume offset =/d' /etc/uswsusp.conf
-fi
-
-#Remove swap line in /etc/rc.local
-sed -i '/swap/d' /etc/rc.local
+DEL_SWAP_FILES && LOGGER "Old temp swap file removed..."
 
 LOGGER "Exiting..."
 
